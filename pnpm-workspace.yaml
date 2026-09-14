@@ -1,3 +1,11 @@
 packages:
-  - packages/apps/*
-  - packages/lib/*
+    - packages/apps/*
+    - packages/lib/*
+    - packages/test/*
+allowBuilds:
+    '@parcel/watcher': true
+    esbuild: true
+    sharp: true
+    sqlite3: true
+    unrs-resolver: true
+    workerd: true

@@ -1,0 +1,14 @@
+{
+    "extends": "../../../tsconfig.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "rootDir": "./src",
+        "paths": {
+            "#/*": ["src/*"]
+        },
+        "types": ["node", "vitest/globals"],
+        "outDir": "./dist"
+    },
+    "references": [{ "path": "../i18n" }],
+    "include": ["src/**/*"]
+}

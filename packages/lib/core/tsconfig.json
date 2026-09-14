@@ -6,11 +6,16 @@
         "paths": {
             "#/*": ["src/*"]
         },
-        "types": ["node", "jest"],
+        "types": ["node", "vitest/globals"],
         "outDir": "./dist"
     },
     "references": [
-        { "path": "../plugins" }
+        { "path": "../agent" },
+        { "path": "../config" },
+        { "path": "../i18n" },
+        { "path": "../plugins" },
+        { "path": "../telegram" },
+        { "path": "../web" }
     ],
     "include": ["src/**/*"]
 }

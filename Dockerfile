@@ -9,16 +9,24 @@ COPY . /app
 WORKDIR /app
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm run build:local
+RUN pnpm run build:server
 
 FROM node:20-slim AS prod
 
 WORKDIR /app
 
-COPY --from=build /app/packages/apps/local/dist/index.js /app/dist/index.js
-COPY --from=build /app/packages/apps/local/package-docker.json /app/package.json
+COPY --from=build /app/packages/apps/server/dist/node.js /app/dist/node.js
+COPY --from=build /app/packages/apps/server/dist/vercel.js /app/dist/vercel.js
+COPY --from=build /app/packages/apps/server/package-docker.json /app/package.json
 
-RUN npm install
+# sqlite3 may fall back to node-gyp when no prebuilt binary matches; keep the
+# toolchain only for the install step, then purge it to keep the image small.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && npm install \
+    && apt-get purge -y python3 make g++ \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 EXPOSE 8787
 
-CMD ["node", "/app/dist/index.js"]
+CMD ["node", "/app/dist/node.js"]
