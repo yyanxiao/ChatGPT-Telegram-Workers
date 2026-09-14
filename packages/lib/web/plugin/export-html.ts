@@ -39,7 +39,7 @@ export function htmlToString(options: HtmlToStringOptions = {}): Plugin {
                     modulePreload: false,
                     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
                     rollupOptions: {
-                        output: { inlineDynamicImports: true },
+                        output: { codeSplitting: false },
                     },
                 },
             };

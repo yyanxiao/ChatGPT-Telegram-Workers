@@ -1,6 +1,6 @@
 import { createVitestConfig } from '../../../vitest.config.shared';
 
 export default createVitestConfig({
-    root: __dirname,
+    root: import.meta.dirname,
     workspaceDeps: ['i18n'],
 });

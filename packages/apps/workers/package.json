@@ -4,12 +4,11 @@
     "type": "module",
     "main": "./dist/index.js",
     "scripts": {
-        "build": "pnpm vite build",
+        "build": "pnpm vite build && pnpm tsx scripts/check-bundle.ts",
         "clean": "rm -rf dist && rm -rf node_modules && rm -rf tsconfig.tsbuildinfo",
         "deploy": "wrangler deploy --config ${WRANGLER_PATH}"
     },
     "devDependencies": {
-        "@chatgpt-telegram-workers/core": "workspace:*",
-        "telegramify-markdown": "^1.3.0"
+        "@chatgpt-telegram-workers/core": "workspace:*"
     }
 }

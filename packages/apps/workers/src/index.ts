@@ -1,5 +1,4 @@
 import { createApp, ENV } from '@chatgpt-telegram-workers/core';
-import { applyMessageRender } from './markdown';
 
 /**
  * Cloudflare Workers 入口:最小依赖、自包含单文件。
@@ -8,7 +7,6 @@ import { applyMessageRender } from './markdown';
 const app = createApp({
     onRequest: env => {
         ENV.merge((env as Record<string, any>) ?? {});
-        applyMessageRender();
     },
 });
 

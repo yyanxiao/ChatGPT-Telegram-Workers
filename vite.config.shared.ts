@@ -1,7 +1,6 @@
 import type { LibraryFormats, Plugin, UserConfig } from 'vite';
 import * as path from 'node:path';
-import { builtinModules } from 'node:module';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
+import { createRequire } from 'node:module';
 import cleanup from 'rollup-plugin-cleanup';
 import { nodeExternals } from 'rollup-plugin-node-externals';
 import { defineConfig } from 'vite';
@@ -14,11 +13,6 @@ export interface Options {
     formats?: LibraryFormats[];
     nodeExternals?: boolean;
     excludeMonoRepoPackages?: boolean;
-    /**
-     * 保留 Node 内建为外部依赖而不打桩(Workers 单文件产物需要:
-     * workerd 的 nodejs_compat 在运行时提供,而非 Vite 的浏览器空壳)。
-     */
-    builtinExternals?: boolean;
     /** 单入口(相对 root),默认 src/index。与 entries 二选一。 */
     entry?: string;
     /** 输出文件名(不含扩展名),默认 index。 */
@@ -29,17 +23,23 @@ export interface Options {
     emptyOutDir?: boolean;
 }
 
-/** 匹配 Node 内建模块的裸名与 `node:` 前缀形式 */
-const NODE_BUILTIN_PATTERN = new RegExp(
-    `^(node:)?(${builtinModules.filter(m => !m.startsWith('_')).join('|')})(/.*)?$`,
-);
+/**
+ * `bundleTypes` 由 api-extractor 打包 .d.ts,而它内置的 TypeScript 版本无法解析
+ * 由 `@typescript/typescript6` 生成的声明(报 `Unable to follow symbol for "Record"`),
+ * TypeScript 7 又不再提供经典 JS Compiler API。这里定位到 `@typescript/typescript6`
+ * 实际桥接的 TypeScript 6,显式交给 api-extractor 使用。
+ */
+function resolveDtsCompilerFolder(): string | undefined {
+    try {
+        const bridgePkg = createRequire(import.meta.url).resolve('@typescript/typescript6/package.json');
+        return path.dirname(createRequire(bridgePkg).resolve('@typescript/old/package.json'));
+    } catch {
+        return undefined;
+    }
+}
 
 export function createShareConfig(options: Options): UserConfig {
     const plugins: Plugin[] = [
-        nodeResolve({
-            browser: false,
-            preferBuiltins: true,
-        }),
         cleanup({
             comments: 'none',
             extensions: ['js', 'ts'],
@@ -49,9 +49,11 @@ export function createShareConfig(options: Options): UserConfig {
         }),
     ];
     if (options.types) {
+        const compilerFolder = resolveDtsCompilerFolder();
         plugins.push(
             dts({
-                rollupTypes: true,
+                // invokeOptions 仅在 bundleTypes 为对象时生效
+                bundleTypes: compilerFolder ? { invokeOptions: { typescriptCompilerFolder: compilerFolder } } : true,
             }),
         );
     }
@@ -91,9 +93,6 @@ export function createShareConfig(options: Options): UserConfig {
             sourcemap: true,
             minify: false,
             outDir: path.resolve(options.root, 'dist'),
-            ...(options.builtinExternals
-                ? { rollupOptions: { external: (id: string) => NODE_BUILTIN_PATTERN.test(id) } }
-                : {}),
         },
     });
 }

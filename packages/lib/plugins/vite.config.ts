@@ -1,6 +1,6 @@
 import { createShareConfig } from '../../../vite.config.shared';
 
 export default createShareConfig({
-    root: __dirname,
+    root: import.meta.dirname,
     types: true,
 });

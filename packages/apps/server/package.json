@@ -11,16 +11,14 @@
     },
     "dependencies": {
         "@chatgpt-telegram-workers/core": "workspace:*",
-        "ioredis": "^5.11.1",
+        "ioredis": "^6.0.0",
         "jsonc-parser": "^3.3.1",
-        "sqlite3": "^5.1.7",
+        "sqlite3": "^6.0.1",
         "telegram-bot-api-types": "^10.2.0",
-        "telegramify-markdown": "^1.3.0",
-        "undici": "^7.1.0"
+        "telegramify-markdown": "^1.3.3",
+        "undici": "^8.10.2"
     },
     "devDependencies": {
-        "@chatgpt-telegram-workers/test-mocks": "workspace:*",
-        "@vercel/node": "^5.4.1",
-        "typescript": "^5.9.3"
+        "@chatgpt-telegram-workers/test-mocks": "workspace:*"
     }
 }
