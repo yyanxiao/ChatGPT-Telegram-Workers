@@ -154,6 +154,7 @@ wrangler.deploy.jsonc
 /dist/src
 /packages/**/dist
 .env*.local
+.dev.vars
 /.zcode/plans
 /.agents/skills
 /.claude/skills

@@ -8,6 +8,9 @@ ChatGPT-Telegram-Workers
 <p align="center">
     <em>Deploy your own Telegram ChatGPT bot on Cloudflare Workers with ease.</em>
 </p>
+<p align="center">
+    <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
+</p>
 
 ## About
 
@@ -35,6 +38,7 @@ You can customize the system initialization information so that your debugged pe
 
 ## Documentation
 
+- [Deploy in one click](https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers) — Cloudflare clones the repo, creates the KV namespace, asks for your bot token and deploys.
 - [Deploy Cloudflare Workers](./doc/en/DEPLOY.md)
 - [Deploy Vercel, Local, Docker](./doc/en/DEPLOY_OTHERS.md)
 - [Configuration and Commands](./doc/en/CONFIG.md)

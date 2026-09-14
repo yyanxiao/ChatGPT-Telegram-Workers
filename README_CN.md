@@ -8,6 +8,9 @@ ChatGPT-Telegram-Workers
 <p align="center">
     <em>轻松在Cloudflare Workers上部署您自己的Telegram ChatGPT机器人。</em>
 </p>
+<p align="center">
+    <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
+</p>
 
 ## 关于
 
@@ -33,6 +36,7 @@ ChatGPT-Telegram-Workers
 
 ## 文档
 
+- [一键部署](https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers) —— Cloudflare 会克隆仓库、创建 KV namespace、询问 Bot Token 并完成部署。
 - [部署Cloudflare Workers](./doc/cn/DEPLOY.md)
 - [部署Vercel、本地、Docker](./doc/cn/DEPLOY_OTHERS.md)
 - [配置参数和指令](./doc/cn/CONFIG.md)

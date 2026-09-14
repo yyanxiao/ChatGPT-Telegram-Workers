@@ -27,7 +27,22 @@ Cloudflare Workers 是本项目的默认部署方式,也是最简单的方式:�
 
 感谢 [**科技小白堂**](https://www.youtube.com/@lipeng0820) 提供此视频教程。
 
-## 方式一:命令行部署(推荐)
+## 方式一:一键部署(Deploy to Cloudflare 按钮)
+
+最省事的方式 —— 不需要本地环境,也不用手动创建 KV:
+
+<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
+
+点击按钮,登录 Cloudflare 并按提示操作,Cloudflare 会:
+
+1. 把本仓库克隆到你的 GitHub 账号下;
+2. 读取 [wrangler.jsonc](../../wrangler.jsonc),创建 `DATABASE` KV namespace,并把 id 写回克隆出来的仓库;
+3. 询问 [`.dev.vars.example`](../../.dev.vars.example) 中声明的值 —— `TELEGRAM_TOKEN` 和 `ADMIN_ID` 必填,`ADMIN_PASSWORD` 可选 —— 并保存为 Worker 的 Secret;
+4. 运行 `package.json` 里的 `build`、`deploy` 脚本(`pnpm run build`,再 `pnpm run deploy`)完成构建与部署。
+
+克隆出来的仓库归你所有,可以继续开发;该按钮适用于全新部署,不用于更新已有部署。完成后继续看[初始化](#初始化)。
+
+## 方式二:命令行部署
 
 ### 1. 创建 KV namespace
 
@@ -69,7 +84,7 @@ pnpm run deploy
 
 部署完成后 wrangler 会输出 Worker 地址,形如 `https://chatgpt-telegram-workers.<你的子域>.workers.dev`。
 
-## 方式二:连接 Git 仓库(Cloudflare Builds)
+## 方式三:连接 Git 仓库(Cloudflare Builds)
 
 Cloudflare 可以在你同步 fork 时自动构建并部署 Worker,全程不需要本地开发环境 —— 而且**不需要修改 fork 里的任何文件**:KV namespace id 通过 build variable 在部署时注入,机器人凭证在控制台设置。这与 [Sink](https://docs.sink.cool/deployment/workers) 项目的部署流程一致。
 
@@ -79,6 +94,7 @@ Cloudflare 可以在你同步 fork 时自动构建并部署 Worker,全程不需�
    - 生产分支(Production branch):`master`
    - 构建命令(Build command):留空即可 —— 部署命令会自己完成构建
    - 部署命令(Deploy command):`pnpm run deploy:builds`
+   - 非生产分支部署命令(Non-production branch deploy command):`pnpm run deploy:preview` —— 如果你会推送预览分支,这一项必须设置;默认的 `npx wrangler versions upload` 不会注入 KV namespace id,会构建失败
 4. **添加 build variable**:在 Worker 的 *Settings → Build variables* 中添加 `DEPLOY_KV_NAMESPACE_ID`,值为你的 KV namespace id。可选变量:
    - `DEPLOY_KV_PREVIEW_NAMESPACE_ID` — 预览构建使用的 KV namespace(默认与生产相同)
    - `DEPLOY_WORKER_NAME` — 覆盖 Worker 名称
@@ -105,7 +121,7 @@ Worker 部署完成后还不会响应消息,需要告诉它 Bot Token。在 Work
 
 以后想更新,把 fork 与上游仓库同步即可,Cloudflare 会自动重新构建部署。
 
-## 方式三:控制台复制粘贴(无需构建工具)
+## 方式四:控制台复制粘贴(无需构建工具)
 
 如果不想在本地运行任何东西 —— 这是唯一使用预构建 [`dist/index.js`](../../dist/index.js) 的部署方式:
 
@@ -138,4 +154,4 @@ Worker 部署完成后还不会响应消息,需要告诉它 Bot Token。在 Work
 
 > 群聊使用:需要在 BotFather 中把机器人的隐私模式设为 **Disable**(`/setprivacy`),公开群还需要把机器人设为管理员,否则机器人收不到 `@bot` 消息。
 
-> 想要自动更新?方式二(Workers Builds)会在你每次同步 fork 时自动重新构建部署,无需配置任何 GitHub secrets 或 Actions。
+> 想要自动更新?方式三(Workers Builds)会在你每次同步 fork 时自动重新构建部署,无需配置任何 GitHub secrets 或 Actions。

@@ -27,7 +27,22 @@ You need three things:
 
 Thanks to [**科技小白堂**](https://www.youtube.com/@lipeng0820) for the video.
 
-## Option A: Deploy from the command line (recommended)
+## Option A: One-click deploy (Deploy to Cloudflare button)
+
+The quickest route — no local toolchain and no manual KV setup:
+
+<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/TBXark/ChatGPT-Telegram-Workers"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"></a>
+
+Click the button, sign in to Cloudflare and follow the prompts. Cloudflare will:
+
+1. clone this repository into your GitHub account;
+2. read [wrangler.jsonc](../../wrangler.jsonc), create the `DATABASE` KV namespace and write its id back into the cloned repository;
+3. ask for the values declared in [`.dev.vars.example`](../../.dev.vars.example) — `TELEGRAM_TOKEN` and `ADMIN_ID` are required, `ADMIN_PASSWORD` is optional — and store them as Worker secrets;
+4. run the `build` and `deploy` scripts from `package.json` (`pnpm run build`, then `pnpm run deploy`) to build and deploy the Worker.
+
+The cloned repository is yours to keep developing in; the button is intended for a fresh deployment, not for updating an existing one. Continue with [Initialize](#initialize).
+
+## Option B: Deploy from the command line
 
 ### 1. Create a KV namespace
 
@@ -69,7 +84,7 @@ pnpm run deploy
 
 Wrangler will print your worker URL, something like `https://chatgpt-telegram-workers.<your-subdomain>.workers.dev`.
 
-## Option B: Connect a Git repository (Cloudflare Builds)
+## Option C: Connect a Git repository (Cloudflare Builds)
 
 Cloudflare builds and deploys the Worker automatically whenever you sync your fork. No local development environment needed — and **no need to edit any file in your fork**: the KV namespace id is injected at deploy time from a build variable, and bot credentials are set in the dashboard. This is the same flow as the [Sink](https://docs.sink.cool/deployment/workers) project.
 
@@ -79,6 +94,7 @@ Cloudflare builds and deploys the Worker automatically whenever you sync your fo
    - Production branch: `master`
    - Build command: leave it empty — the deploy command builds everything it needs
    - Deploy command: `pnpm run deploy:builds`
+   - Non-production branch deploy command: `pnpm run deploy:preview` — required if you push preview branches; the default `npx wrangler versions upload` would skip the KV namespace id injection and fail
 4. **Add the build variable**: in the Worker's *Settings → Build variables*, add `DEPLOY_KV_NAMESPACE_ID` with your KV namespace id as the value. Optional variables:
    - `DEPLOY_KV_PREVIEW_NAMESPACE_ID` — KV namespace for preview builds (defaults to the production one)
    - `DEPLOY_WORKER_NAME` — override the Worker name
@@ -105,7 +121,7 @@ Then **retry the build** (or push any commit) so the new variables take effect. 
 
 To ship updates, sync your fork with the upstream repository — Cloudflare rebuilds and redeploys automatically.
 
-## Option C: Copy & paste in the dashboard (no build tools)
+## Option D: Copy & paste in the dashboard (no build tools)
 
 If you don't want to run anything locally — this is the only deployment that uses the prebuilt [`dist/index.js`](../../dist/index.js):
 
@@ -138,4 +154,4 @@ See [Configuration](CONFIG.md) for details.
 
 > Group chats: set the bot's privacy mode to **Disable** in BotFather (`/setprivacy`), and add the bot as an administrator in public groups, otherwise it won't see `@bot` messages.
 
-> Want automatic updates? Option B (Workers Builds) rebuilds and redeploys the Worker every time you sync your fork — no GitHub secrets or Actions needed.
+> Want automatic updates? Option C (Workers Builds) rebuilds and redeploys the Worker every time you sync your fork — no GitHub secrets or Actions needed.

@@ -9,9 +9,14 @@
     "$schema": "./node_modules/wrangler/config-schema.json",
     "name": "chatgpt-telegram-workers",
     // Bundles directly from the TypeScript source; workspace dependencies resolve to
-    // their built output (pnpm run build:workers). The root dist/ folder is only for
-    // copy-paste deployments in the Cloudflare dashboard.
+    // their built output. The root dist/ folder is only for copy-paste deployments in
+    // the Cloudflare dashboard.
     "main": "./packages/apps/workers/src/index.ts",
+    // Build the workspace packages before bundling, so that any `wrangler` command
+    // (`deploy`, `versions upload`, including the Cloudflare Workers Builds defaults)
+    // can resolve `@chatgpt-telegram-workers/*` without a separate build step.
+    // `-w` runs the root script when wrangler is invoked from a subpackage.
+    "build": { "command": "pnpm -w run build:workers" },
     // nodejs_compat is enabled by default at this date, no compatibility flags needed.
     "compatibility_date": "2026-08-04",
 
