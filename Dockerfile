@@ -3,7 +3,9 @@ FROM node:26-slim AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack disable && npm install -g pnpm@latest
+# Node >=25 no longer bundles corepack, so install the pnpm version pinned in
+# package.json's packageManager field directly.
+RUN npm install -g pnpm@12.4.1
 
 COPY . /app
 WORKDIR /app
