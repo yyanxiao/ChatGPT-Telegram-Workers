@@ -317,7 +317,10 @@ test('never exposes the stored key and only clears it explicitly', async ({ page
     await page.click('[data-back]');
     await page.click('[data-save]');
     await expect
-        .poll(async () => (await harness.botClient.getConfig()).chatProviders.find((p: any) => p.id === 'secret-chat')?.hasApiKey)
+        .poll(
+            async () =>
+                (await harness.botClient.getConfig()).chatProviders.find((p: any) => p.id === 'secret-chat')?.hasApiKey,
+        )
         .toBe(false);
 });
 

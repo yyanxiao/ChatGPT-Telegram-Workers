@@ -1,4 +1,4 @@
-import type { ChatAgent, HistoryModifierResult, ImageAgent, Message } from '@chatgpt-telegram-workers/agent';
+import type { HistoryModifierResult, Message } from '@chatgpt-telegram-workers/agent';
 import type * as Telegram from 'telegram-bot-api-types';
 import type { WorkerContext } from '../context';
 import type { CommandHandler } from './types';
@@ -7,16 +7,12 @@ import { ENV } from '@chatgpt-telegram-workers/config';
 import { createTelegramBotAPI, MessageSender } from '@chatgpt-telegram-workers/telegram';
 import { isGroupChat, TELEGRAM_AUTH_CHECKER } from '../auth';
 import { chatWithMessage } from '../chat';
-import { modelKeyboard, providerRow } from '../handler/handlers';
+import { agentSummary, currentProvider, providerKeyboard, providerPage } from '../handler/handlers';
 import { MENU_COMMANDS } from './menu-commands';
 
 /** 把文本中的 HTML 特殊字符转义,避免插入 <pre> 时破坏标记 */
 function escapeHtml(text: string): string {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function agentSummary(agent: ChatAgent | ImageAgent | null): string {
-    return agent ? `${agent.label} | ${agent.model}` : 'Nan';
 }
 
 export class ImgCommandHandler implements CommandHandler {
@@ -26,23 +22,16 @@ export class ImgCommandHandler implements CommandHandler {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         const agent = loadImageGen(ENV.CONFIG);
         if (subcommand === '') {
-            // 无参数时:有多个图片模型可切换则给出键盘,否则只展示说明
-            const providers = ENV.CONFIG.imageProviders.filter(p => p.enabled && p.models.length > 0);
-            const provider = providers.find(p => p.id === ENV.CONFIG.defaultImageProvider) ?? providers[0];
+            // 无参数时:先列出 provider,选中后再展示其模型列表
             const text = `${ENV.I18N.command.help.img}\n\n${agentSummary(agent)}`;
-            if (!provider) {
+            const current = currentProvider('image');
+            if (!current) {
                 return sender.sendPlainText(text);
-            }
-            const providerIdx = ENV.CONFIG.imageProviders.indexOf(provider);
-            const keyboard = modelKeyboard('image', providerIdx, provider.model, provider.models);
-            const rows = providerRow('image');
-            if (rows.length) {
-                keyboard.inline_keyboard.push(...rows);
             }
             return sender.sendRawMessage({
                 chat_id: message.chat.id,
-                text: `${text}\n${provider.label}`,
-                reply_markup: keyboard,
+                text: `${text}\n${ENV.I18N.callback_query.select_provider}`,
+                reply_markup: providerKeyboard('image', providerPage('image', current.index), current.id),
             });
         }
         try {
@@ -279,29 +268,22 @@ export class RedoCommandHandler implements CommandHandler {
 }
 
 /**
- * /models:用 InlineKeyboard 列出可用 provider 与当前 provider 的模型,点击即切换。
- * callback_data `mp:{providerIdx}` / `m:{providerIdx}:{modelIdx}`,由 CallbackQueryHandler 处理。
+ * /models:两步 InlineKeyboard —— 先分页选 provider(`mp:{page}`),
+ * 再分页选模型(`ml:{i}:{page}` / `m:{i}:{j}` 切换),由 CallbackQueryHandler 处理。
  */
 export class ModelsCommandHandler implements CommandHandler {
     command = '/models';
     scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
-        const providers = ENV.CONFIG.chatProviders.filter(p => p.enabled && p.models.length > 0);
-        if (!providers.length) {
+        const current = currentProvider('chat');
+        if (!current) {
             return sender.sendPlainText('ERROR: No models. Add a provider in the admin panel first.');
-        }
-        const provider = providers.find(p => p.id === ENV.CONFIG.defaultChatProvider) ?? providers[0];
-        const providerIdx = ENV.CONFIG.chatProviders.indexOf(provider);
-        const keyboard = modelKeyboard('chat', providerIdx, provider.model, provider.models);
-        const rows = providerRow('chat');
-        if (rows.length) {
-            keyboard.inline_keyboard.push(...rows);
         }
         return sender.sendRawMessage({
             chat_id: message.chat.id,
-            text: `${agentSummary(loadChatLLM(ENV.CONFIG))}\n${provider.label}\n${ENV.I18N.callback_query.select_model}`,
-            reply_markup: keyboard,
+            text: `${agentSummary(loadChatLLM(ENV.CONFIG))}\n${ENV.I18N.callback_query.select_provider}`,
+            reply_markup: providerKeyboard('chat', providerPage('chat', current.index), current.id),
         });
     };
 }

@@ -22,5 +22,6 @@ export default {
         select_provider: '选择一个模型提供商:',
         select_model: '选择一个模型:',
         change_model: '对话模型已修改至',
+        back: '返回',
     },
 };

@@ -31,6 +31,7 @@ export interface I18n {
         select_provider: string;
         select_model: string;
         change_model: string;
+        back: string;
     };
 }
 

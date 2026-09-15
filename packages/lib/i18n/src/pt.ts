@@ -22,5 +22,6 @@ export default {
         select_provider: 'Escolha um fornecedor de modelos.:',
         select_model: 'Escolha um modelo:',
         change_model: 'O modelo de diálogo já foi modificado para',
+        back: 'Voltar',
     },
 };

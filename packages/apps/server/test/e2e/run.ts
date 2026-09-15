@@ -274,14 +274,14 @@ async function run(): Promise<void> {
             );
             s.expectIncludes('system shows agent', telegram.lastText(ADMIN_ID), 'AGENT');
 
-            // /models 返回带回调的键盘
+            // /models 先返回 provider 列表键盘
             telegram.reset();
             await botClient.sendUpdate(textMessage({ chatId, userId: WHITELIST_USER, text: '/models' }), SECRET_TOKEN);
             const keyboard = telegram.lastMessage(chatId)?.keyboard as any;
             s.expect('models keyboard present', !!keyboard?.inline_keyboard);
             s.expect(
-                'models keyboard has callback_data',
-                (keyboard?.inline_keyboard ?? []).flat().some((b: any) => String(b.callback_data).startsWith('m:')),
+                'models keyboard lists providers',
+                (keyboard?.inline_keyboard ?? []).flat().some((b: any) => String(b.callback_data).startsWith('ml:')),
             );
             s.finish();
         }
@@ -291,8 +291,42 @@ async function run(): Promise<void> {
             const s = new Scenario('callbacks');
             const chatId = ADMIN_ID;
 
-            // 切到第二个模型: m:{providerIdx}:{modelIdx}
             const providerIdx = (await botClient.getConfig()).chatProviders.findIndex((p: any) => p.id === 'mock-chat');
+
+            // 第一步 → 第二步:点 provider 展示它的模型列表(不改配置)
+            telegram.reset();
+            await botClient.sendUpdate(
+                callbackQuery({ data: `ml:${providerIdx}:0`, userId: ADMIN_ID, chatId, messageId: 4999 }),
+                SECRET_TOKEN,
+            );
+            const modelKeyboard = telegram.lastMessage(chatId)?.keyboard as any;
+            s.expect(
+                'provider click lists models',
+                (modelKeyboard?.inline_keyboard ?? [])
+                    .flat()
+                    .some((b: any) => String(b.callback_data).startsWith('m:')),
+            );
+            s.expectIncludes('provider click shows label', telegram.lastText(chatId), 'mock-chat');
+            s.expectEq(
+                'provider click does not switch model',
+                (await botClient.getConfig()).chatProviders[providerIdx].model,
+                'mock-model',
+            );
+
+            // 返回按钮回到 provider 列表
+            telegram.reset();
+            await botClient.sendUpdate(
+                callbackQuery({ data: `mp:0`, userId: ADMIN_ID, chatId, messageId: 4999 }),
+                SECRET_TOKEN,
+            );
+            s.expect(
+                'back button returns to provider list',
+                ((telegram.lastMessage(chatId)?.keyboard as any)?.inline_keyboard ?? [])
+                    .flat()
+                    .some((b: any) => String(b.callback_data).startsWith('ml:')),
+            );
+
+            // 切到第二个模型: m:{providerIdx}:{modelIdx}
             telegram.reset();
             await botClient.sendUpdate(
                 callbackQuery({ data: `m:${providerIdx}:1`, userId: ADMIN_ID, chatId, messageId: 5000 }),

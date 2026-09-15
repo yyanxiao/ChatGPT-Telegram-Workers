@@ -22,5 +22,6 @@ export default {
         select_provider: 'Select a provider:',
         select_model: 'Choose model:',
         change_model: 'Change model to ',
+        back: 'Back',
     },
 };

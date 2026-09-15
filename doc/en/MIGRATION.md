@@ -122,7 +122,7 @@ Re-create each `PLUGIN_COMMAND_*` variable as a plugin entry (command, descripti
 ## Other behavior changes
 
 - **`MAX_TOKEN_LENGTH` no longer caps model output.** It now only trims history. To limit a reply's length, use the new **Max Output Tokens** setting (`maxOutputTokens`, `0` = protocol default).
-- **`/models` and `/img`** now list models for every enabled provider and let you switch provider as well as model; the previous keyboard prefixes (`al:`, `ca:`, `cm:`, `ial:`, `ica:`, `icm:`) are gone — send `/models` again to refresh.
+- **`/models` and `/img`** are now two-step and paginated: first pick a provider (up to 4 per page, current one marked `✓`), then pick a model (up to 6 per page, with a button to go back to the provider list). Pagination rows only appear when there is more than one page. The previous keyboard prefixes (`al:`, `ca:`, `cm:`, `ial:`, `ica:`, `icm:`) are gone; the current ones are `mp:`/`ip:` (provider page), `ml:`/`il:` (model page) and `m:`/`im:` (select model) — send `/models` again to refresh.
 - **Private-chat commands** for whitelisted, non-admin users work as in v1 (only privileged commands such as `/admin`, `/system` and the config shortcuts are restricted to `ADMIN_ID`).
 - **Workers single-file build no longer bundles `telegramify-markdown`.** The Workers package keeps zero third-party runtime dependencies, so it does not install a `MarkdownV2` render hook — sending with `MarkdownV2` on Workers falls back to plain text. The Node/server build (`packages/apps/server`) still uses `telegramify-markdown` and keeps full `MarkdownV2` support.
 

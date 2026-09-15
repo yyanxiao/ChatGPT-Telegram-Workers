@@ -59,11 +59,15 @@ test('user clicks an inline keyboard button from the web client', async ({ page 
     // 切到 Admin 会话(若有多个)
     await page.locator('#sidebar button', { hasText: 'Admin' }).first().click();
 
-    // 发 /models 让 bot 回一个键盘
+    // 发 /models:第一步先选 provider
     await page.fill('input[name="text"]', '/models');
     await page.click('button[type="submit"]');
 
-    // 等键盘按钮出现,点第二个模型
+    const providerButton = page.locator('#keyboard button', { hasText: 'mock-chat' });
+    await expect(providerButton).toBeVisible({ timeout: 15_000 });
+    await providerButton.click();
+
+    // 第二步:provider 的模型列表,点第二个模型
     const button = page.locator('#keyboard button', { hasText: 'mock-model-2' });
     await expect(button).toBeVisible({ timeout: 15_000 });
     await button.click();

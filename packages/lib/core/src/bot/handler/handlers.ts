@@ -1,6 +1,9 @@
+import type { ChatAgent, ImageAgent } from '@chatgpt-telegram-workers/agent';
+import type { ChatProviderConfig, ImageProviderConfig } from '@chatgpt-telegram-workers/config';
 import type * as Telegram from 'telegram-bot-api-types';
 import type { WorkerContext } from '../context';
 import type { MessageHandler, UpdateHandler } from './types';
+import { loadChatLLM, loadImageGen } from '@chatgpt-telegram-workers/agent';
 import { ENV } from '@chatgpt-telegram-workers/config';
 import { createTelegramBotAPI, MessageSender } from '@chatgpt-telegram-workers/telegram';
 import { isGroupChat } from '../auth';
@@ -143,10 +146,10 @@ export class SaveLastMessage implements MessageHandler {
 }
 
 /**
- * InlineKeyboard 回调处理:
- * - `mp:{i}` / `ip:{i}`  切换展示的聊天/图片 provider 的模型列表
- * - `m:{i}:{j}`          切换聊天模型(defaultChatProvider + provider.model)
- * - `im:{i}:{j}`         切换图片模型(defaultImageProvider + provider.model)
+ * InlineKeyboard 回调处理(两步:先选 provider,再选模型,两步各自分页):
+ * - `mp:{page}` / `ip:{page}`          展示聊天/图片 provider 列表第 page 页
+ * - `ml:{i}:{page}` / `il:{i}:{page}`  展示 provider i 的模型列表第 page 页
+ * - `m:{i}:{j}` / `im:{i}:{j}`         切换聊天/图片模型(default*Provider + provider.model)
  * 必须注册在 Update2MessageHandler 之前,否则 callback_query 会被当作无效消息丢弃。
  * 切换写入全局配置,因此群聊仅限管理员。
  */
@@ -167,11 +170,11 @@ export class CallbackQueryHandler implements UpdateHandler {
 
         try {
             const parts = (cb.data || '').split(':');
-            if (!['m', 'mp', 'im', 'ip'].includes(parts[0])) {
+            if (!['m', 'mp', 'im', 'ip', 'ml', 'il'].includes(parts[0])) {
                 await answer();
                 return ok();
             }
-            const kind: 'chat' | 'image' = parts[0] === 'm' || parts[0] === 'mp' ? 'chat' : 'image';
+            const kind: ModelKind = ['m', 'mp', 'ml'].includes(parts[0]) ? 'chat' : 'image';
 
             // 群组内切换模型是全局变更,仅限管理员;私聊白名单已由 AccessFilter 把关
             if (cb.message && isGroupChat(cb.message.chat.type)) {
@@ -183,12 +186,6 @@ export class CallbackQueryHandler implements UpdateHandler {
             }
 
             const providers = kind === 'image' ? ENV.CONFIG.imageProviders : ENV.CONFIG.chatProviders;
-            const providerIdx = Number(parts[1]);
-            const provider = providers[providerIdx];
-            if (!provider) {
-                await answer('Model list changed, send the command again');
-                return ok();
-            }
             const edit = (text: string, keyboard: Telegram.InlineKeyboardMarkup): Promise<unknown> =>
                 cb.message
                     ? api
@@ -202,20 +199,39 @@ export class CallbackQueryHandler implements UpdateHandler {
                           .catch(() => undefined)
                     : Promise.resolve(undefined);
 
-            // 选中 provider:仅展示其模型列表,不改默认值
+            // 第一步:provider 列表分页,不改默认值
             if (parts[0] === 'mp' || parts[0] === 'ip') {
-                if (!provider.models.length) {
-                    await answer('No models for this provider');
-                    return ok();
-                }
+                const agent = kind === 'image' ? loadImageGen(ENV.CONFIG) : loadChatLLM(ENV.CONFIG);
                 await edit(
-                    `${provider.label}\n${ENV.I18N.callback_query.select_model}`,
-                    modelKeyboard(kind, providerIdx, provider.model, provider.models),
+                    `${agentSummary(agent)}\n${ENV.I18N.callback_query.select_provider}`,
+                    providerKeyboard(kind, Number(parts[1]) || 0, currentProvider(kind)?.id ?? null),
                 );
                 return ok();
             }
 
-            const model = provider.models[Number(parts[2])];
+            const providerIdx = Number(parts[1]);
+            const provider = providers[providerIdx];
+            if (!provider) {
+                await answer('Model list changed, send the command again');
+                return ok();
+            }
+
+            // 第二步:该 provider 的模型列表分页,不改默认值
+            if (parts[0] === 'ml' || parts[0] === 'il') {
+                const entry = enabledProviders(kind).find(p => p.index === providerIdx);
+                if (!entry) {
+                    await answer('No models for this provider');
+                    return ok();
+                }
+                await edit(
+                    `${entry.label}\n${ENV.I18N.callback_query.select_model}`,
+                    modelKeyboard(kind, providerIdx, entry.model, entry.models, Number(parts[2]) || 0),
+                );
+                return ok();
+            }
+
+            const modelIdx = Number(parts[2]);
+            const model = provider.models[modelIdx];
             if (!model) {
                 await answer('Model list changed, send the command again');
                 return ok();
@@ -233,7 +249,7 @@ export class CallbackQueryHandler implements UpdateHandler {
             await answer(model);
             await edit(
                 `${ENV.I18N.callback_query.change_model} ${provider.label} / ${model}`,
-                modelKeyboard(kind, providerIdx, model, provider.models),
+                modelKeyboard(kind, providerIdx, model, provider.models, Math.floor(modelIdx / MODEL_PAGE_SIZE)),
             );
         } catch (e) {
             console.error('callback query error:', e);
@@ -243,37 +259,127 @@ export class CallbackQueryHandler implements UpdateHandler {
     };
 }
 
-/** 模型选择键盘:标注当前模型;provider 切换由调用方拼接 providerRow */
-export function modelKeyboard(
-    kind: 'chat' | 'image',
-    providerIdx: number,
-    current: string,
-    models: string[],
+export type ModelKind = 'chat' | 'image';
+
+/** provider 列表每页容量;<= 该值时不显示翻页行 */
+export const PROVIDER_PAGE_SIZE = 4;
+/** 模型列表每页容量;<= 该值时不显示翻页行 */
+export const MODEL_PAGE_SIZE = 6;
+
+/** 可用 provider(已启用且有模型)及其在原数组中的下标 */
+export interface ProviderEntry {
+    index: number;
+    id: string;
+    label: string;
+    model: string;
+    models: string[];
+}
+
+export function agentSummary(agent: ChatAgent | ImageAgent | null): string {
+    return agent ? `${agent.label} | ${agent.model}` : 'Nan';
+}
+
+/** 可用 provider 列表,保留原数组下标以便回调定位 */
+export function enabledProviders(kind: ModelKind): ProviderEntry[] {
+    const providers: (ChatProviderConfig | ImageProviderConfig)[] =
+        kind === 'image' ? ENV.CONFIG.imageProviders : ENV.CONFIG.chatProviders;
+    const entries: ProviderEntry[] = [];
+    providers.forEach((p, index) => {
+        if (p.enabled && p.models.length > 0) {
+            entries.push({ index, id: p.id, label: p.label, model: p.model, models: p.models });
+        }
+    });
+    return entries;
+}
+
+/** 当前生效的 provider:默认项优先,否则取首个可用项 */
+export function currentProvider(kind: ModelKind): ProviderEntry | null {
+    const providers = enabledProviders(kind);
+    const defaultId = kind === 'image' ? ENV.CONFIG.defaultImageProvider : ENV.CONFIG.defaultChatProvider;
+    return providers.find(p => p.id === defaultId) ?? providers[0] ?? null;
+}
+
+/** provider 原数组下标 → 它在可用列表中的页号 */
+export function providerPage(kind: ModelKind, providerIdx: number): number {
+    const pos = enabledProviders(kind).findIndex(p => p.index === providerIdx);
+    return pos < 0 ? 0 : Math.floor(pos / PROVIDER_PAGE_SIZE);
+}
+
+function clampPage(page: number, total: number, pageSize: number): { page: number; totalPages: number } {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safe = Number.isFinite(page) ? Math.min(Math.max(0, Math.trunc(page)), totalPages - 1) : 0;
+    return { page: safe, totalPages };
+}
+
+/** 翻页行:页数 <= 1 时不展示,首/末页省略不可用的箭头 */
+function pageRow(page: number, totalPages: number, data: (page: number) => string): Telegram.InlineKeyboardButton[][] {
+    if (totalPages <= 1) {
+        return [];
+    }
+    const row: Telegram.InlineKeyboardButton[] = [];
+    if (page > 0) {
+        row.push({ text: '⬅️', callback_data: data(page - 1) });
+    }
+    // 页码仅作指示:callback_data 不在白名单内,点击会被静默忽略
+    row.push({ text: `${page + 1}/${totalPages}`, callback_data: 'page' });
+    if (page < totalPages - 1) {
+        row.push({ text: '➡️', callback_data: data(page + 1) });
+    }
+    return [row];
+}
+
+/** provider 选择键盘:每行 1 个,每页 PROVIDER_PAGE_SIZE 个,超出才出现翻页行 */
+export function providerKeyboard(
+    kind: ModelKind,
+    page: number,
+    currentProviderId: string | null,
 ): Telegram.InlineKeyboardMarkup {
-    const prefix = kind === 'image' ? 'im' : 'm';
-    const inline_keyboard = models
-        .slice(0, 100)
-        .map((m, modelIdx) => [
-            { text: m === current ? `✓ ${m}` : m, callback_data: `${prefix}:${providerIdx}:${modelIdx}` },
+    const providers = enabledProviders(kind);
+    const { page: safePage, totalPages } = clampPage(page, providers.length, PROVIDER_PAGE_SIZE);
+    const providerPrefix = kind === 'image' ? 'il' : 'ml';
+    const listPrefix = kind === 'image' ? 'ip' : 'mp';
+    const start = safePage * PROVIDER_PAGE_SIZE;
+    const inline_keyboard: Telegram.InlineKeyboardButton[][] = providers
+        .slice(start, start + PROVIDER_PAGE_SIZE)
+        .map(p => [
+            {
+                text: p.id === currentProviderId ? `✓ ${p.label}` : p.label,
+                callback_data: `${providerPrefix}:${p.index}:0`,
+            },
         ]);
+    inline_keyboard.push(...pageRow(safePage, totalPages, p => `${listPrefix}:${p}`));
     return { inline_keyboard };
 }
 
-/** provider 切换行:有多个可用 provider 时才展示 */
-export function providerRow(kind: 'chat' | 'image'): Telegram.InlineKeyboardButton[][] {
-    const providers: { id: string; label: string; enabled: boolean; models: string[] }[] =
-        kind === 'image' ? ENV.CONFIG.imageProviders : ENV.CONFIG.chatProviders;
-    const enabled = providers.filter(p => p.enabled && p.models.length > 0);
-    if (enabled.length <= 1) {
-        return [];
-    }
-    const prefix = kind === 'image' ? 'ip' : 'mp';
-    return [
-        enabled.map(p => ({
-            text: p.label,
-            callback_data: `${prefix}:${providers.indexOf(p)}`,
-        })),
-    ];
+/** 模型选择键盘:每行 1 个,每页 MODEL_PAGE_SIZE 个,末尾附返回 provider 列表的按钮 */
+export function modelKeyboard(
+    kind: ModelKind,
+    providerIdx: number,
+    current: string,
+    models: string[],
+    page = 0,
+): Telegram.InlineKeyboardMarkup {
+    const prefix = kind === 'image' ? 'im' : 'm';
+    const listPrefix = kind === 'image' ? 'il' : 'ml';
+    const { page: safePage, totalPages } = clampPage(page, models.length, MODEL_PAGE_SIZE);
+    const start = safePage * MODEL_PAGE_SIZE;
+    const inline_keyboard: Telegram.InlineKeyboardButton[][] = models
+        .slice(start, start + MODEL_PAGE_SIZE)
+        .map((m, i) => [
+            {
+                text: m === current ? `✓ ${m}` : m,
+                // 分页只影响展示,callback_data 始终带全局模型下标
+                callback_data: `${prefix}:${providerIdx}:${start + i}`,
+            },
+        ]);
+    inline_keyboard.push(...pageRow(safePage, totalPages, p => `${listPrefix}:${providerIdx}:${p}`));
+    inline_keyboard.push([
+        {
+            text: `⬅️ ${ENV.I18N.callback_query.back}`,
+            callback_data: `${kind === 'image' ? 'ip' : 'mp'}:${providerPage(kind, providerIdx)}`,
+        },
+    ]);
+    return { inline_keyboard };
 }
 
 export class OldMessageFilter implements MessageHandler {
