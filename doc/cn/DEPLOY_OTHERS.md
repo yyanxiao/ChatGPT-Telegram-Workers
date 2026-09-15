@@ -104,6 +104,12 @@ Vercel 部署运行在 Node.js runtime 上,使用 [Upstash Redis](https://upstas
 
 ### 手动部署
 
+Vercel CLI 不是仓库依赖,请先全局安装:
+
+```shell
+npm i -g vercel
+```
+
 ```shell
 pnpm install
 pnpm run deploy:vercel

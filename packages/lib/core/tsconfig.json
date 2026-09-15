@@ -13,8 +13,7 @@
         { "path": "../config" },
         { "path": "../i18n" },
         { "path": "../plugins" },
-        { "path": "../telegram" },
-        { "path": "../web" }
+        { "path": "../telegram" }
     ],
     "include": ["src/**/*"]
 }

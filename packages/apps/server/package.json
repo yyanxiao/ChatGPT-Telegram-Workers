@@ -4,7 +4,7 @@
     "type": "module",
     "main": "./dist/node.js",
     "scripts": {
-        "build": "pnpm vite build -c vite.node.config.ts && pnpm vite build -c vite.vercel.config.ts && pnpm tsx scripts/docker-package.ts",
+        "build": "pnpm tsx scripts/build.ts && pnpm tsx scripts/docker-package.ts",
         "start": "pnpm tsx src/node.ts",
         "start:dist": "node dist/node.js",
         "clean": "rm -rf dist && rm -rf node_modules && rm -rf tsconfig.tsbuildinfo"

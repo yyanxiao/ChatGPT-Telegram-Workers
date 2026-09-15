@@ -30,12 +30,12 @@ function base64UrlDecode(input: string): Uint8Array {
 async function hmac(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
     const cryptoKey = await crypto.subtle.importKey(
         'raw',
-        key as BufferSource,
+        key as Uint8Array<ArrayBuffer>,
         { name: 'HMAC', hash: 'SHA-256' },
         false,
         ['sign'],
     );
-    const signature = await crypto.subtle.sign('HMAC', cryptoKey, data as BufferSource);
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, data as Uint8Array<ArrayBuffer>);
     return new Uint8Array(signature);
 }
 

@@ -6,12 +6,12 @@ const encoder = new TextEncoder();
 async function hmac(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
     const cryptoKey = await crypto.subtle.importKey(
         'raw',
-        key as BufferSource,
+        key as Uint8Array<ArrayBuffer>,
         { name: 'HMAC', hash: 'SHA-256' },
         false,
         ['sign'],
     );
-    return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, data as BufferSource));
+    return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, data as Uint8Array<ArrayBuffer>));
 }
 
 /** Telegram 传入的 hash 为小写 hex 编码 */

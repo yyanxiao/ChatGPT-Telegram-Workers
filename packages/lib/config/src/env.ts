@@ -1,5 +1,5 @@
 import type { I18n } from '@chatgpt-telegram-workers/i18n';
-import type { APIGuardBinding, KVNamespaceBinding, WorkerAIBinding } from './binding';
+import type { APIGuardBinding, KVNamespaceBinding, WorkersAIBinding } from './binding';
 import type { AppConfig } from './types';
 import { loadI18n } from '@chatgpt-telegram-workers/i18n';
 import { cloneDefaultConfig } from './defaults';
@@ -27,7 +27,7 @@ class Environment {
     PUBLIC_BASE_URL = '';
 
     // -- 平台绑定 --
-    AI_BINDING: WorkerAIBinding | null = null;
+    AI_BINDING: WorkersAIBinding | null = null;
     API_GUARD: APIGuardBinding | null = null;
     DATABASE: KVNamespaceBinding = null as any;
 

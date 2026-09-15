@@ -5,12 +5,14 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "pnpm vite build",
+        "build": "tsc -b",
         "clean": "rm -rf dist && rm -rf node_modules && rm -rf tsconfig.tsbuildinfo",
         "test": "vitest run"
     },
+    "dependencies": {
+        "@chatgpt-telegram-workers/types": "workspace:*"
+    },
     "devDependencies": {
-        "@cloudflare/workers-types": "^5.20260914.1",
         "vitest": "^4.1.11"
     }
 }

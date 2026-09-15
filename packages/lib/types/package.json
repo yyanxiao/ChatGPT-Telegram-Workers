@@ -1,5 +1,5 @@
 {
-    "name": "@chatgpt-telegram-workers/i18n",
+    "name": "@chatgpt-telegram-workers/types",
     "version": "1.10.7",
     "type": "module",
     "main": "./dist/index.js",
@@ -7,5 +7,8 @@
     "scripts": {
         "build": "tsc -b",
         "clean": "rm -rf dist && rm -rf node_modules && rm -rf tsconfig.tsbuildinfo"
+    },
+    "dependencies": {
+        "@cloudflare/workers-types": "^5.20260915.1"
     }
 }

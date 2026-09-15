@@ -104,6 +104,12 @@ The button clones the repo and asks for the required environment variables:
 
 ### Manual deployment
 
+The Vercel CLI is not a repository dependency — install it globally first:
+
+```shell
+npm i -g vercel
+```
+
 ```shell
 pnpm install
 pnpm run deploy:vercel

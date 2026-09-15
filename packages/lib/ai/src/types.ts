@@ -1,5 +1,10 @@
-import type { Ai, AiModelsSearchObject, AiModelsSearchParams } from '@cloudflare/workers-types';
 import type { ChatProtocol } from './protocols';
+
+// Workers AI 绑定相关类型与平台绑定契约统一放在 @chatgpt-telegram-workers/types,
+// 这里再导出以保持本包原有的公开 API。
+import type { WorkersAIBinding, WorkersAIModelInfo } from '@chatgpt-telegram-workers/types';
+
+export type { WorkersAIBinding, WorkersAIModelInfo };
 
 export type ImageInput = string | URL | Uint8Array;
 
@@ -52,13 +57,6 @@ export interface CompletionResult {
 export type Protocol = ChatProtocol;
 
 /**
- * `models()` 返回的条目。字段取自官方 `AiModelsSearchObject`(来源变更会在编译期暴露),
- * 但整体保持宽松:绑定与账号级 REST 搜索共用此形状,后者是不受信任的 JSON,
- * 因此字段可选、`task` 不做收窄,由解析方按运行时形状判断。
- */
-export type WorkersAIModelInfo = Partial<Pick<AiModelsSearchObject, 'id' | 'name'>> & { task?: unknown };
-
-/**
  * 需要 multipart 信封的图片输入(flux-2 系列等)。
  * `body` 是 FormData 编码后的流,`contentType` 必须带上与之一致的 boundary,
  * 否则 Cloudflare 会以 5006 "required properties at '/' are 'multipart'" 拒绝。
@@ -82,17 +80,6 @@ export type WorkersImageParams = { prompt: string } & Record<string, unknown>;
  * - 输入 schema 要求 `multipart` 的模型必须用信封包裹(见上)。
  */
 export type WorkersImageInput = WorkersImageParams | WorkersImageMultipartInput;
-
-/**
- * Workers AI 绑定:直接以官方 `@cloudflare/workers-types` 的 `Ai` 为基础,
- * 不再手写 `run` 的结构体,模型与输入/输出的定义始终与 Cloudflare 对齐。
- *
- * 只取实际用到的成员:`models` 保持可选(老运行时可能没有该方法,缺失时回退到
- * 账户级 REST 列表)。官方 `Ai` 满足此类型,由 types.test.ts 的编译期断言守护。
- */
-export type WorkersAIBinding = Pick<Ai, 'run'> & {
-    models?(params?: AiModelsSearchParams): Promise<WorkersAIModelInfo[]>;
-};
 
 /** 图片传输方式:URL 直传,或抓取后内联为 base64 */
 export type ImageTransfer = 'url' | 'base64';

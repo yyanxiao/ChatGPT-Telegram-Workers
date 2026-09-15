@@ -8,7 +8,7 @@ describe('template', () => {
     it('renders a JSON response through the output template', async () => {
         const payload = [{ word: 'example', phonetic: '/ɪɡˈzɑːmpəl/', meanings: [] }];
         const fetchMock = vi.fn(
-            async (_url: RequestInfo | URL, _init?: RequestInit) =>
+            async (_url: string | URL | Request, _init?: RequestInit) =>
                 new Response(JSON.stringify(payload), {
                     status: 200,
                     headers: { 'content-type': 'application/json' },
@@ -29,7 +29,7 @@ describe('template', () => {
 
     it('renders the error template on a failed request', async () => {
         const fetchMock = vi.fn(
-            async (_url: RequestInfo | URL, _init?: RequestInit) =>
+            async (_url: string | URL | Request, _init?: RequestInit) =>
                 new Response(JSON.stringify({ message: 'not found' }), {
                     status: 404,
                     headers: { 'content-type': 'application/json' },

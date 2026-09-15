@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { htmlToString } from './plugin/export-html';
+import { htmlToString } from './plugin/export-html.js';
 
 /**
  * 纯前端项目:入口是根目录的 index.html,页面按 pathname 路由到不同的 Web Component。

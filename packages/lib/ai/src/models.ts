@@ -1,3 +1,4 @@
+import type { ErrorPayload } from './fetch';
 import type { WorkersAIBinding, WorkersAIModelInfo } from './types';
 import { workersCredentials } from './workers-ai';
 
@@ -28,7 +29,7 @@ async function getJSON(url: string, headers: Record<string, string>): Promise<an
     if (!response.ok) {
         let detail = `${response.status} ${response.statusText}`;
         try {
-            const data = await response.json();
+            const data = (await response.json()) as ErrorPayload;
             detail = data?.error?.message || data?.message || detail;
         } catch {
             // 保留状态文本

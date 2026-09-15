@@ -1,17 +1,5 @@
-import type { Ai } from '@cloudflare/workers-types';
-
-export interface KVNamespaceBinding {
-    get: (key: string) => Promise<string | any>;
-    put: (key: string, value: string, info?: { expirationTtl?: number; expiration?: number }) => Promise<void>;
-    delete: (key: string) => Promise<void>;
-}
-
-export interface APIGuardBinding {
-    fetch: (request: Request) => Promise<Response>;
-}
-
 /**
- * Workers AI 绑定(`env.AI`):直接采用官方 `@cloudflare/workers-types` 的 `Ai`。
- * 不再手写 `run` 的结构体,模型与输入/输出的定义始终与 Cloudflare 对齐。
+ * 平台绑定契约(Workers AI / KV / API 守卫)统一收敛在 @chatgpt-telegram-workers/types,
+ * 这里再导出以保持本包原有的公开 API。
  */
-export type WorkerAIBinding = Ai;
+export type { APIGuardBinding, KVNamespaceBinding, WorkersAIBinding } from '@chatgpt-telegram-workers/types';

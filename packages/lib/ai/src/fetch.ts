@@ -28,11 +28,20 @@ export async function postJSON(url: string, options: PostOptions): Promise<Respo
     return response;
 }
 
+/**
+ * 上游错误响应体:Cloudflare 原生形如 `{ success:false, errors:[{ message }] }`,
+ * 其余协议可能是 `{ error: { message } }` 或扁平的 `{ message }`。
+ */
+export interface ErrorPayload {
+    error?: { message?: string };
+    errors?: { message?: string }[];
+    message?: string;
+}
+
 export async function extractErrorMessage(response: Response): Promise<string> {
     const fallback = `${response.status} ${response.statusText}`;
     try {
-        const data = await response.json();
-        // Cloudflare 原生错误形如 { success:false, errors:[{ message }] }
+        const data = (await response.json()) as ErrorPayload;
         return data?.error?.message || data?.errors?.[0]?.message || data?.message || fallback;
     } catch {
         return fallback;

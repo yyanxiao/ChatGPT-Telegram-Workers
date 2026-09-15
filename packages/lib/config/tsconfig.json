@@ -8,6 +8,6 @@
         "types": ["node", "vitest/globals"],
         "outDir": "./dist"
     },
-    "references": [{ "path": "../i18n" }],
+    "references": [{ "path": "../i18n" }, { "path": "../types" }],
     "include": ["src/**/*"]
 }

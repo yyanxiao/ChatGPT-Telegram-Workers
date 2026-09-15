@@ -1,5 +1,5 @@
-import type { Ai } from '@cloudflare/workers-types';
-import type { WorkersAIBinding, WorkersImageMultipartInput, WorkersImageParams } from './types';
+import type { Ai, WorkersAIBinding } from '@chatgpt-telegram-workers/types';
+import type { WorkersImageMultipartInput, WorkersImageParams } from './types';
 
 /**
  * 编译期契约:真实的 `env.AI`(官方 `Ai` 类型)必须能直接当作 `WorkersAIBinding`
