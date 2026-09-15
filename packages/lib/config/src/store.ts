@@ -283,7 +283,8 @@ function maskProvider(provider: ChatProviderConfig | ImageProviderConfig): Maske
         label: provider.label,
         enabled: provider.enabled,
         hasApiKey: !!provider.apiKey,
-        apiKey: provider.apiKey ? MASKED_API_KEY : '',
+        // 不下发任何密钥形态的字符串(含占位符),是否存在由 hasApiKey 表达
+        apiKey: '',
         baseUrl: provider.baseUrl,
         model: provider.model,
         models: provider.models,
@@ -306,14 +307,24 @@ export function maskConfig(config: AppConfig): MaskedConfig {
     };
 }
 
-function unmaskKey(incoming: string, existing?: string): string {
-    if (incoming === MASKED_API_KEY) {
+/**
+ * 保存时解析 apiKey 的三态规则:
+ * - `clear` 为 true → 显式删除,置空;
+ * - 传入空串/未传 → 保持不变(沿用已存值);
+ * - 传入历史占位符 → 保持不变(兼容旧前端);
+ * - 其他非空值 → 覆盖为新值。
+ */
+export function unmaskKey(incoming: string | undefined, existing?: string, clear?: boolean): string {
+    if (clear) {
+        return '';
+    }
+    if (!incoming || incoming === MASKED_API_KEY) {
         return existing ?? '';
     }
     return incoming;
 }
 
-/** 保存用:客户端回传掩码时保留原 Key(含 options 与 plugin env) */
+/** 保存用:空值/占位符保留原 Key,显式 clearApiKey 时删除(含 options 与 plugin env) */
 export function unmaskConfig(incoming: MaskedConfig, existing: AppConfig): AppConfig {
     const chatExisting = new Map(existing.chatProviders.map(p => [p.id, p]));
     const imageExisting = new Map(existing.imageProviders.map(p => [p.id, p]));
@@ -323,7 +334,7 @@ export function unmaskConfig(incoming: MaskedConfig, existing: AppConfig): AppCo
         existingProvider: ChatProviderConfig | ImageProviderConfig | undefined,
     ) => ({
         ...provider,
-        apiKey: unmaskKey(provider.apiKey, existingProvider?.apiKey),
+        apiKey: unmaskKey(provider.apiKey, existingProvider?.apiKey, provider.clearApiKey),
         options: unmaskSecrets(provider.options, existingProvider?.options),
     });
     return normalizeConfig({

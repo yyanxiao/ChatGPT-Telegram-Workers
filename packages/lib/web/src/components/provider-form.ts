@@ -86,10 +86,19 @@ export class ProviderForm extends HTMLElement {
                 f => `
                 <div class="row-field">
                     <span class="row-label">${esc(f.label)}${f.required ? ' <span style="color:var(--red)">*</span>' : ''}</span>
-                    <input class="bare" data-opt="${esc(f.key)}" value="${esc((p.options?.[f.key] as string) ?? '')}" placeholder="${esc(f.placeholder || '')}" aria-label="${esc(f.label)}" />
+                    <input class="bare" ${f.type === 'password' ? 'type="password" autocomplete="off"' : ''} data-opt="${esc(f.key)}" value="${esc((p.options?.[f.key] as string) ?? '')}" placeholder="${esc(f.placeholder || '')}" aria-label="${esc(f.label)}" />
                 </div>`,
             )
             .join('');
+
+        // 已保存的 Key 提供显式清除入口:清空输入框表示「不变」,删除必须显式触发
+        const clearKeyRow = p.clearApiKey
+            ? `<button type="button" class="list-row" data-undo-clear-key>
+                   <span class="row-main"><span class="row-title">Key Will Be Removed</span><span class="row-sub">Tap to undo</span></span>
+               </button>`
+            : p.hasApiKey && !p.apiKey
+              ? `<button type="button" class="list-row destructive" data-clear-key>Clear API Key</button>`
+              : '';
 
         const modelRows = p.models
             .map(
@@ -171,8 +180,9 @@ export class ProviderForm extends HTMLElement {
                     <div class="row-field">
                         <span class="row-label">API Key</span>
                         <input class="bare" type="password" data-field="apiKey" value="${esc(p.apiKey)}"
-                            placeholder="${p.hasApiKey ? 'Unchanged' : 'Required'}" autocomplete="off" aria-label="API key" />
+                            placeholder="${p.hasApiKey && !p.clearApiKey ? 'Unchanged' : 'Required'}" autocomplete="off" aria-label="API key" />
                     </div>
+                    ${clearKeyRow}
                     ${optionRows}
                 </section>
                 <p class="group-footer">API format switch resets the base URL and protocol options.</p>
@@ -225,6 +235,10 @@ export class ProviderForm extends HTMLElement {
                         /* 输入过程中允许暂时非法 */
                     }
                     return;
+                }
+                if (field === 'apiKey') {
+                    // 一旦输入新 Key,之前「删除」的意图即作废
+                    p.clearApiKey = false;
                 }
                 (p as any)[field] = input.value;
             };
@@ -306,6 +320,23 @@ export class ProviderForm extends HTMLElement {
         this.querySelector('[data-toggle-default]')?.addEventListener('click', () => {
             this.opts.onDefault(!this.opts.isDefault);
             this.opts.isDefault = !this.opts.isDefault;
+            rerender();
+        });
+
+        const clearKeyBtn = this.querySelector<HTMLButtonElement>('[data-clear-key]');
+        clearKeyBtn?.addEventListener('click', () =>
+            armConfirm(
+                clearKeyBtn,
+                () => {
+                    p.clearApiKey = true;
+                    p.apiKey = '';
+                    rerender();
+                },
+                'Tap again to remove',
+            ),
+        );
+        this.querySelector('[data-undo-clear-key]')?.addEventListener('click', () => {
+            p.clearApiKey = false;
             rerender();
         });
 

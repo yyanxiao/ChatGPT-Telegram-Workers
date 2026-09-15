@@ -121,7 +121,11 @@ export interface AppConfig {
     customCommands: CustomCommandConfig[];
 }
 
-/** 脱敏后的配置(管理页读取时返回) */
+/**
+ * 脱敏后的配置(管理页读取时返回)。
+ *
+ * `apiKey` 恒为空字符串,Key 是否存在只由 `hasApiKey` 表达 —— 真实密钥从不离开服务端。
+ */
 export interface MaskedProvider {
     id: string;
     protocol: string;
@@ -134,6 +138,11 @@ export interface MaskedProvider {
     models: string[];
     extraParams: Record<string, unknown>;
     options: Record<string, unknown>;
+    /**
+     * 仅用于保存请求:置 true 表示显式删除已保存的 Key。
+     * 未设置时,`apiKey` 为空视为「保持不变」。不落库(normalizeConfig 会丢弃)。
+     */
+    clearApiKey?: boolean;
 }
 
 export interface MaskedConfig {
@@ -147,4 +156,5 @@ export interface MaskedConfig {
     customCommands: CustomCommandConfig[];
 }
 
+/** 历史客户端回传的占位符;读取时已不再下发,保存时仍识别以兼容旧前端 */
 export const MASKED_API_KEY = '••••••••';

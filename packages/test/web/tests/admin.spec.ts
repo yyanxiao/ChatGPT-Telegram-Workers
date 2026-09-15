@@ -272,6 +272,55 @@ test('creates a plugin and a custom command, then deletes the plugin', async ({ 
     await expect.poll(async () => (await harness.botClient.getConfig()).plugins.length).toBe(0);
 });
 
+test('never exposes the stored key and only clears it explicitly', async ({ page }) => {
+    const harness = await getHarness();
+    await harness.applyConfig({
+        chatProviders: [
+            {
+                id: 'secret-chat',
+                label: 'Secret Provider',
+                apiKey: 'sk-top-secret-e2e',
+                model: 'mock-model',
+                models: ['mock-model'],
+            },
+        ],
+    });
+
+    await login(page, harness.baseUrl);
+
+    // 读取接口不下发任何密钥形态的字符串,只给出 hasApiKey
+    const stored = (await harness.botClient.getConfig()).chatProviders;
+    expect(stored[0].apiKey).toBe('');
+    expect(stored[0].hasApiKey).toBe(true);
+    expect(JSON.stringify(stored)).not.toContain('sk-top-secret-e2e');
+
+    // 表单里 Key 输入框为空,仅用 placeholder 提示已保存
+    await page.click('.tab-btn[data-tab="providers"]');
+    await page.locator('.page-root[data-tab="providers"] [data-edit="secret-chat"]').click();
+    const keyInput = page.locator('input[data-field="apiKey"]');
+    await expect(keyInput).toHaveValue('');
+    await expect(keyInput).toHaveAttribute('placeholder', 'Unchanged');
+
+    // 不动 Key 直接保存:原 Key 必须保留
+    await page.click('[data-back]');
+    await page.click('[data-save]');
+    await expect
+        .poll(async () => (await harness.botClient.getConfig()).chatProviders.find((p: any) => p.id === 'secret-chat'))
+        .toMatchObject({ hasApiKey: true, apiKey: '' });
+
+    // 显式清除需要二次确认
+    await page.locator('.page-root[data-tab="providers"] [data-edit="secret-chat"]').click();
+    await page.click('[data-clear-key]');
+    await expect(page.locator('[data-clear-key]')).toBeVisible(); // 第一次点击只是待确认态
+    await page.click('[data-clear-key]');
+    await expect(page.locator('[data-undo-clear-key]')).toBeVisible();
+    await page.click('[data-back]');
+    await page.click('[data-save]');
+    await expect
+        .poll(async () => (await harness.botClient.getConfig()).chatProviders.find((p: any) => p.id === 'secret-chat')?.hasApiKey)
+        .toBe(false);
+});
+
 test('manages image providers on the Image tab', async ({ page }) => {
     const harness = await getHarness();
     await harness.applyConfig({ imageProviders: [] });

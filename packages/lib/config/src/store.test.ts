@@ -115,19 +115,37 @@ describe('mask / unmask', () => {
         chatProviders: [{ id: 'openai-1', protocol: 'chat-completions', apiKey: 'sk-secret', model: 'gpt-4o' }],
     });
 
-    it('masks api keys on read', () => {
+    it('never returns the raw key, only exposes hasApiKey', () => {
         const masked = maskConfig(config);
-        expect(masked.chatProviders[0].apiKey).toBe(MASKED_API_KEY);
+        expect(masked.chatProviders[0].apiKey).toBe('');
         expect(masked.chatProviders[0].hasApiKey).toBe(true);
+        expect(JSON.stringify(masked)).not.toContain('sk-secret');
     });
 
-    it('keeps original key when masked value comes back', () => {
+    it('keeps original key when an empty value comes back (empty means unchanged)', () => {
         const masked = maskConfig(config);
         masked.chatProviders[0].models = ['gpt-4o', 'gpt-4o-mini'];
         masked.chatProviders[0].model = 'gpt-4o-mini';
+        expect(masked.chatProviders[0].apiKey).toBe('');
         const restored = unmaskConfig(masked, config);
         expect(restored.chatProviders[0].apiKey).toBe('sk-secret');
         expect(restored.chatProviders[0].model).toBe('gpt-4o-mini');
+    });
+
+    it('still accepts the legacy masked placeholder from older clients', () => {
+        const masked = maskConfig(config);
+        masked.chatProviders[0].apiKey = MASKED_API_KEY;
+        const restored = unmaskConfig(masked, config);
+        expect(restored.chatProviders[0].apiKey).toBe('sk-secret');
+    });
+
+    it('clears the key only when clearApiKey is set', () => {
+        const masked = maskConfig(config);
+        masked.chatProviders[0].clearApiKey = true;
+        const restored = unmaskConfig(masked, config);
+        expect(restored.chatProviders[0].apiKey).toBe('');
+        // clearApiKey 是请求级标志,不落库
+        expect(restored.chatProviders[0]).not.toHaveProperty('clearApiKey');
     });
 
     it('accepts a new key when provided', () => {

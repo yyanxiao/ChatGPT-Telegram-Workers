@@ -14,6 +14,7 @@ export interface ProtocolOption {
     modelList: string;
 }
 
+/** 脱敏后的 provider:apiKey 恒为空,是否存在看 hasApiKey */
 export interface MaskedProvider {
     id: string;
     protocol: string;
@@ -26,6 +27,8 @@ export interface MaskedProvider {
     models: string[];
     extraParams: Record<string, unknown>;
     options: Record<string, unknown>;
+    /** 保存请求专用:true 表示显式删除已保存的 Key */
+    clearApiKey?: boolean;
 }
 
 export interface AppSettings {

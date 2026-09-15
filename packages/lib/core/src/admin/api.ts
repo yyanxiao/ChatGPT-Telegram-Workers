@@ -6,7 +6,7 @@ import {
     loadChatLLM,
     loadImageGen,
 } from '@chatgpt-telegram-workers/agent';
-import { ENV, MASKED_API_KEY, maskConfig, unmaskConfig } from '@chatgpt-telegram-workers/config';
+import { ENV, MASKED_API_KEY, maskConfig, unmaskConfig, unmaskKey } from '@chatgpt-telegram-workers/config';
 import { RpcError, type RpcMethods } from '../rpc';
 import { checkPassword, createSession, extractBearer, isAdmin, validateInitData, verifySession } from './auth';
 
@@ -97,7 +97,7 @@ export function createAdminMethods(): RpcMethods {
             };
         },
 
-        // 按草稿 provider 拉取模型列表(草稿里是掩码 Key,需按 id 还原成已保存的真实值)
+        // 按草稿 provider 拉取模型列表(草稿里没有明文 Key,需按 id 还原成已保存的真实值)
         'admin.models': async (params, ctx) => {
             await requireAuth(ctx.request);
             const body = (params ?? {}) as { kind?: 'chat' | 'image'; provider?: MaskedProvider };
@@ -116,12 +116,15 @@ export function createAdminMethods(): RpcMethods {
     };
 }
 
-/** 把草稿 provider 中的掩码 Key / 敏感 options 还原成已保存配置里的真实值 */
+/**
+ * 把草稿 provider 的密钥还原成已保存配置里的真实值(按 id),供服务端拉取模型列表。
+ * 规则与保存路径一致:空值/占位符沿用已存 Key,显式 clearApiKey 则视为没有 Key。
+ */
 function unmaskProviderFromStore(provider: MaskedProvider, kind: 'chat' | 'image') {
     const stored = (kind === 'image' ? ENV.CONFIG.imageProviders : ENV.CONFIG.chatProviders).find(
         p => p.id === provider.id,
     );
-    const options = { ...provider.options };
+    const options: Record<string, unknown> = { ...provider.options };
     for (const [key, value] of Object.entries(options)) {
         if (value === MASKED_API_KEY) {
             options[key] = stored?.options?.[key] ?? '';
@@ -130,7 +133,7 @@ function unmaskProviderFromStore(provider: MaskedProvider, kind: 'chat' | 'image
     return {
         protocol: provider.protocol,
         baseUrl: provider.baseUrl,
-        apiKey: provider.apiKey === MASKED_API_KEY ? (stored?.apiKey ?? '') : provider.apiKey,
+        apiKey: unmaskKey(provider.apiKey, stored?.apiKey, provider.clearApiKey),
         options,
     };
 }
