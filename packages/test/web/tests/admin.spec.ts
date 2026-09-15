@@ -36,22 +36,34 @@ test('Mini App initData logs in without a password', async ({ page }) => {
     await expect(page.locator('#pwd')).toHaveCount(0);
 });
 
-test('toggles and saves settings through the UI', async ({ page }) => {
+test('toggles and saves settings through grouped sub-pages', async ({ page }) => {
     const harness = await getHarness();
     await page.goto(`${harness.baseUrl}/admin`);
     await page.fill('#pwd', ADMIN_PASSWORD);
     await page.click('#login');
     await expect(page.locator('.tabbar .tab-btn')).toHaveCount(5);
 
-    // 切到 Settings
+    // 切到 Settings:根页是分组菜单,点分组 push 进入子页
     await page.click('.tab-btn[data-tab="settings"]');
-    const allowAll = page.locator('input[name="allowAllUsers"]');
+    const settingsRoot = page.locator('.page-root[data-tab="settings"]');
+    await expect(settingsRoot.locator('[data-goto="general"]')).toBeVisible();
+
+    // General 子页:设置公开地址
+    await settingsRoot.locator('[data-goto="general"]').click();
+    await expect(page.locator('settings-detail')).toBeVisible();
+    await page.fill('[data-key="publicBaseUrl"]', 'https://example.test');
+    await page.click('[data-back]');
+    await expect(page.locator('settings-detail')).toHaveCount(0);
+
+    // Access Control 子页:允许所有用户
+    await settingsRoot.locator('[data-goto="access"]').click();
+    const allowAll = page.locator('[data-key="allowAllUsers"]');
     await expect(allowAll).toBeVisible();
     await expect(allowAll).not.toBeChecked();
     await allowAll.check();
+    await page.click('[data-back]');
+    await expect(page.locator('settings-detail')).toHaveCount(0);
 
-    // 设置公开地址
-    await page.fill('input[name="publicBaseUrl"]', 'https://example.test');
     await page.click('[data-save]');
 
     // 通过 RPC 断言已持久化
@@ -60,9 +72,44 @@ test('toggles and saves settings through the UI', async ({ page }) => {
     expect(saved.settings.publicBaseUrl).toBe('https://example.test');
 
     // 还原,避免影响后续用例
-    await allowAll.uncheck();
+    await settingsRoot.locator('[data-goto="access"]').click();
+    await page.locator('[data-key="allowAllUsers"]').uncheck();
+    await page.click('[data-back]');
     await page.click('[data-save]');
     await expect.poll(async () => (await harness.botClient.getConfig()).settings.allowAllUsers).toBe(false);
+});
+
+test('adds and removes allowed user IDs as a list', async ({ page }) => {
+    const harness = await getHarness();
+    await harness.applyConfig({ settings: { allowAllUsers: false, allowedUserIds: [], allowedGroupIds: [] } });
+
+    await login(page, harness.baseUrl);
+    await page.click('.tab-btn[data-tab="settings"]');
+    const settingsRoot = page.locator('.page-root[data-tab="settings"]');
+    await settingsRoot.locator('[data-goto="access"]').click();
+    await expect(page.locator('settings-detail')).toBeVisible();
+
+    // 通过“Add User ID”行内表单添加两个 ID
+    await page.click('[data-list-add="allowedUserIds"]');
+    await page.fill('[data-list-input="allowedUserIds"]', '111111');
+    await page.click('[data-list-confirm="allowedUserIds"]');
+    await expect(page.locator('[data-list-remove="allowedUserIds"][data-value="111111"]')).toBeVisible();
+
+    await page.click('[data-list-add="allowedUserIds"]');
+    await page.fill('[data-list-input="allowedUserIds"]', '222222');
+    await page.click('[data-list-confirm="allowedUserIds"]');
+    await expect(page.locator('[data-list-remove="allowedUserIds"][data-value="222222"]')).toBeVisible();
+
+    // 删除第一个 ID
+    await page.click('[data-list-remove="allowedUserIds"][data-value="111111"]');
+    await expect(page.locator('[data-list-remove="allowedUserIds"][data-value="111111"]')).toHaveCount(0);
+
+    // 返回触发自动保存
+    await page.click('[data-back]');
+    await expect.poll(async () => (await harness.botClient.getConfig()).settings.allowedUserIds).toEqual(['222222']);
+
+    // 还原全局配置,避免影响后续用例
+    await harness.applyConfig({ settings: { allowedUserIds: [] } });
 });
 
 test('edits a provider model through the detail form and saves', async ({ page }) => {
