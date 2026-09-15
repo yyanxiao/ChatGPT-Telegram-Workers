@@ -51,7 +51,7 @@ Add one provider entry per old provider, then pick the default one. Providers ar
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_API_BASE` / `ANTHROPIC_CHAT_MODEL` | Chat provider, API format `anthropic-messages` |
 | `AZURE_API_KEY` / `AZURE_COMPLETIONS_API` / `AZURE_CHAT_MODEL` | Chat provider, API format `chat-completions`, base URL = your Azure deployment URL, and set the provider's **API Key Header** option to `api-key` |
 | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_TOKEN` + `WORKERS_CHAT_MODEL` | Chat provider, API format `workers` (account id/token in the provider options, or keep the `AI` binding) |
-| `DALL_E_MODEL` / `DALL_E_*` | Image provider, API format `images`; global size/quality/style moved to *Settings* (`imageSize` / `imageQuality` / `imageStyle`) |
+| `DALL_E_MODEL` / `DALL_E_*` | Image provider, API format `images`; size/quality/style go into that provider's **Extra Params** JSON (they are OpenAI-specific, so they are no longer global settings) |
 | `WORKERS_IMAGE_MODEL` | Image provider, API format `workers` |
 | `AI_PROVIDER` / `AI_IMAGE_PROVIDER` | The default provider selection (`defaultChatProvider` / `defaultImageProvider`) |
 | `OPENAI_CHAT_MODELS_LIST` and every other `*_MODELS_LIST` | The provider's model list (the admin panel can also fetch it from the endpoint) |

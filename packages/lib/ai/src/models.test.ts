@@ -80,4 +80,115 @@ describe('fetchModels', () => {
             restore();
         }
     });
+
+    it('lists workers models through the AI binding without credentials', async () => {
+        const mock = vi.fn();
+        const restore = withFetch(mock);
+        const models = vi.fn().mockResolvedValue([{ name: '@cf/meta/llama-3-8b-instruct' }, { name: null }, {}]);
+        try {
+            const result = await fetchModels(
+                'workers',
+                { protocol: 'workers', baseUrl: '', apiKey: '', options: {}, binding: { run: vi.fn() as any, models } },
+                'chat',
+            );
+            expect(result).toEqual(['@cf/meta/llama-3-8b-instruct']);
+            expect(models).toHaveBeenCalledWith({ task: 'Text Generation', per_page: 100 });
+            expect(mock).not.toHaveBeenCalled();
+        } finally {
+            restore();
+        }
+    });
+
+    it('asks the binding for image models when kind is image', async () => {
+        const models = vi.fn().mockResolvedValue([]);
+        await fetchModels(
+            'workers',
+            { protocol: 'workers', baseUrl: '', apiKey: '', options: {}, binding: { run: vi.fn() as any, models } },
+            'image',
+        );
+        expect(models).toHaveBeenCalledWith({ task: 'Text-to-Image', per_page: 100 });
+    });
+
+    it('keeps only chat models when the runtime returns mixed tasks', async () => {
+        const models = vi.fn().mockResolvedValue([
+            { name: '@cf/meta/llama-3-8b-instruct', task: { name: 'Text Generation' } },
+            { name: '@cf/stable-diffusion-xl', task: { name: 'Text-to-Image' } },
+            { name: '@cf/baai/bge-large-en-v1.5', task: { name: 'Text Embeddings' } },
+        ]);
+        const result = await fetchModels(
+            'workers',
+            { protocol: 'workers', baseUrl: '', apiKey: '', options: {}, binding: { run: vi.fn() as any, models } },
+            'chat',
+        );
+        expect(result).toEqual(['@cf/meta/llama-3-8b-instruct']);
+    });
+
+    it('keeps only image models when the runtime returns mixed tasks', async () => {
+        const models = vi.fn().mockResolvedValue([
+            { name: '@cf/meta/llama-3-8b-instruct', task: { name: 'Text Generation' } },
+            { name: '@cf/stable-diffusion-xl', task: { name: 'Text-to-Image' } },
+            // 归一化后等价,不能因连字符写法差异被过滤掉
+            { name: '@cf/black-forest-labs/flux-1-schnell', task: 'Text to Image' },
+        ]);
+        const result = await fetchModels(
+            'workers',
+            { protocol: 'workers', baseUrl: '', apiKey: '', options: {}, binding: { run: vi.fn() as any, models } },
+            'image',
+        );
+        expect(result).toEqual(['@cf/stable-diffusion-xl', '@cf/black-forest-labs/flux-1-schnell']);
+    });
+
+    it('keeps entries whose task is unknown rather than dropping them', async () => {
+        const models = vi.fn().mockResolvedValue([{ name: '@cf/unknown-model' }]);
+        const result = await fetchModels(
+            'workers',
+            { protocol: 'workers', baseUrl: '', apiKey: '', options: {}, binding: { run: vi.fn() as any, models } },
+            'chat',
+        );
+        expect(result).toEqual(['@cf/unknown-model']);
+    });
+
+    it('filters REST search results by task as well', async () => {
+        const mock = vi.fn().mockResolvedValue(
+            jsonResponse({
+                result: [
+                    { name: '@cf/stable-diffusion-xl', task: { name: 'Text-to-Image' } },
+                    { name: '@cf/meta/llama-3-8b-instruct', task: { name: 'Text Generation' } },
+                ],
+            }),
+        );
+        const restore = withFetch(mock);
+        try {
+            const result = await fetchModels(
+                'workers',
+                { protocol: 'workers', baseUrl: '', apiKey: '', options: { accountId: 'acc', token: 'tok' } },
+                'image',
+            );
+            expect(result).toEqual(['@cf/stable-diffusion-xl']);
+        } finally {
+            restore();
+        }
+    });
+
+    it('falls back to REST credentials when the binding has no models()', async () => {
+        const mock = vi.fn().mockResolvedValue(jsonResponse({ result: [{ name: '@cf/meta/llama-3-8b-instruct' }] }));
+        const restore = withFetch(mock);
+        try {
+            const result = await fetchModels(
+                'workers',
+                {
+                    protocol: 'workers',
+                    baseUrl: '',
+                    apiKey: '',
+                    options: { accountId: 'acc', token: 'tok' },
+                    binding: { run: vi.fn() as any },
+                },
+                'chat',
+            );
+            expect(result).toEqual(['@cf/meta/llama-3-8b-instruct']);
+            expect(mock.mock.calls[0][0]).toContain('accounts/acc/ai/models/search?task=Text%20Generation');
+        } finally {
+            restore();
+        }
+    });
 });

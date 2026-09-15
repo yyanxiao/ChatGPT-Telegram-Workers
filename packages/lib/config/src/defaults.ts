@@ -33,10 +33,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     safeMode: true,
     debugMode: false,
     devMode: false,
-
-    imageSize: '1024x1024',
-    imageQuality: 'standard',
-    imageStyle: 'vivid',
 };
 
 /** 默认没有配置任何 AI 提供商,全部由管理页添加 */

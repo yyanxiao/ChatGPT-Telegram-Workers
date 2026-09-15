@@ -50,7 +50,7 @@ v2(2.0.0)是一次大版本重写。最大的变化:**配置从几十个环境�
 | `ANTHROPIC_API_KEY` / `ANTHROPIC_API_BASE` / `ANTHROPIC_CHAT_MODEL` | 聊天 provider,API 格式 `anthropic-messages` |
 | `AZURE_API_KEY` / `AZURE_COMPLETIONS_API` / `AZURE_CHAT_MODEL` | 聊天 provider,API 格式 `chat-completions`,Base URL 填 Azure 部署地址 |
 | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_TOKEN` + `WORKERS_CHAT_MODEL` | 聊天 provider,API 格式 `workers`(account id/token 填在 provider 的 options 里,或继续使用 `AI` 绑定) |
-| `DALL_E_MODEL` / `DALL_E_*` | 图片 provider,API 格式 `images`;全局尺寸/质量/风格移到 *Settings*(`imageSize` / `imageQuality` / `imageStyle`) |
+| `DALL_E_MODEL` / `DALL_E_*` | 图片 provider,API 格式 `images`;尺寸/质量/风格填在该 provider 的 **Extra Params** JSON 里(它们是 OpenAI 专有参数,不再作为全局设置) |
 | `WORKERS_IMAGE_MODEL` | 图片 provider,API 格式 `workers` |
 | `AI_PROVIDER` / `AI_IMAGE_PROVIDER` | 默认服务商选择(`defaultChatProvider` / `defaultImageProvider`) |
 | `OPENAI_CHAT_MODELS_LIST` 以及所有 `*_MODELS_LIST` | provider 的模型列表(管理面板也可以直接从端点拉取) |

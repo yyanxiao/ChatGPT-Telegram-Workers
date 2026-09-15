@@ -340,11 +340,39 @@ test('manages image providers on the Image tab', async ({ page }) => {
     await page.click('[data-add-model]');
     await page.fill('[data-model-input]', 'dall-e-3');
     await page.click('[data-confirm-model]');
+    // 生成参数按 provider 配置:经脱敏/回填后必须原样保存
+    await page.fill('textarea[data-field="extraParams"]', '{"size":"1792x1024","quality":"hd"}');
     await page.click('[data-back]');
     await page.click('[data-save]');
 
     const images = (await harness.botClient.getConfig()).imageProviders;
     expect(images.some((p: any) => p.label === 'Browser Image' && p.model === 'dall-e-3')).toBe(true);
+    expect(images.find((p: any) => p.label === 'Browser Image')?.extraParams).toEqual({
+        size: '1792x1024',
+        quality: 'hd',
+    });
+});
+
+test('hides Base URL and API Key for workers providers', async ({ page }) => {
+    const harness = await getHarness();
+    await harness.applyConfig({ chatProviders: [] });
+
+    await login(page, harness.baseUrl);
+    await page.click('.tab-btn[data-tab="providers"]');
+    await page.locator('.page-root[data-tab="providers"] [data-add]').click();
+
+    // 切到 workers 协议:Base URL / API Key 不是该协议读取的字段,必须消失
+    await page.selectOption('[data-apply-protocol]', 'workers');
+    await expect(page.locator('input[data-field="baseUrl"]')).toHaveCount(0);
+    await expect(page.locator('input[data-field="apiKey"]')).toHaveCount(0);
+    // accountId/token 才是该协议真正的凭据字段
+    await expect(page.locator('input[data-opt="accountId"]')).toBeVisible();
+    await expect(page.locator('input[data-opt="token"]')).toBeVisible();
+
+    // 切回 HTTP 协议后两个字段恢复
+    await page.selectOption('[data-apply-protocol]', 'chat-completions');
+    await expect(page.locator('input[data-field="baseUrl"]')).toBeVisible();
+    await expect(page.locator('input[data-field="apiKey"]')).toBeVisible();
 });
 
 async function login(page: import('@playwright/test').Page, baseUrl: string): Promise<void> {

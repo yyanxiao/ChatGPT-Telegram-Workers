@@ -12,6 +12,10 @@ export interface ProtocolOption {
     defaultBaseUrl: string;
     optionFields?: ProtocolField[];
     modelList: string;
+    /** 协议是否读取 provider.baseUrl;workers 为 false,表单不展示该行 */
+    usesBaseUrl: boolean;
+    /** 协议是否读取 provider.apiKey;workers 为 false,表单不展示该行 */
+    usesApiKey: boolean;
 }
 
 /** 脱敏后的 provider:apiKey 恒为空,是否存在看 hasApiKey */
@@ -68,4 +72,6 @@ export interface MaskedConfig {
 export interface Meta {
     chatProtocols: ProtocolOption[];
     imageProtocols: ProtocolOption[];
+    /** 部署是否已绑定 Workers AI;有绑定时 workers 提供商不需要 accountId/token */
+    workersBinding: boolean;
 }

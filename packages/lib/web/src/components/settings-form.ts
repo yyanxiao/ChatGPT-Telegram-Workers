@@ -16,7 +16,7 @@ interface FieldDef {
     addLabel?: string;
 }
 
-type GroupId = 'general' | 'chat' | 'telegram' | 'access' | 'history' | 'image';
+type GroupId = 'general' | 'chat' | 'telegram' | 'access' | 'history';
 
 interface GroupDef {
     id: GroupId;
@@ -43,7 +43,6 @@ const GROUPS: GroupDef[] = [
     { id: 'telegram', label: 'Telegram', icon: 'globe', tint: 'var(--teal)' },
     { id: 'access', label: 'Access Control', icon: 'lock', tint: 'var(--orange)' },
     { id: 'history', label: 'History', icon: 'refresh', tint: 'var(--purple)' },
-    { id: 'image', label: 'Image Generation', icon: 'image', tint: 'var(--red)' },
 ];
 
 const FIELDS: FieldDef[] = [
@@ -115,10 +114,6 @@ const FIELDS: FieldDef[] = [
     { key: 'maxHistoryLength', label: 'Max History Length', type: 'number', group: 'history' },
     { key: 'maxTokenLength', label: 'Max Token Length', type: 'number', group: 'history' },
     { key: 'historyImagePlaceholder', label: 'History Image Placeholder', type: 'text', group: 'history' },
-
-    { key: 'imageSize', label: 'Image Size', type: 'text', group: 'image' },
-    { key: 'imageQuality', label: 'Image Quality', type: 'text', group: 'image' },
-    { key: 'imageStyle', label: 'Image Style', type: 'text', group: 'image' },
 ];
 
 /** 拷贝 settings 并浅复制其中的数组,避免直接改动宿主传入的 config.settings */
@@ -366,8 +361,6 @@ export class SettingsForm extends HTMLElement {
             }
             case 'history':
                 return `Max ${String(s.maxHistoryLength ?? 0)} messages`;
-            case 'image':
-                return `${s.imageSize || 'auto'} · ${s.imageStyle || 'vivid'}`;
         }
     }
 

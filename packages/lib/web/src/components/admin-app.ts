@@ -133,6 +133,7 @@ export class AdminApp extends HTMLElement {
                 isChat ? meta.chatProtocols : meta.imageProtocols,
                 isChat ? config.chatProviders : config.imageProviders,
                 isChat ? config.defaultChatProvider : config.defaultImageProvider,
+                meta.workersBinding,
             );
         } else if (tab === 'settings') {
             page = document.createElement('settings-form') as any;

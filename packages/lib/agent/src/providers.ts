@@ -76,14 +76,12 @@ export function createChatAgent(
 }
 
 /** 组装 OpenAI Images 协议的图片 agent(workers 走 workersai.ts) */
-export function createImageAgent(provider: ImageProviderConfig, settings: AppSettings): ImageAgent {
+export function createImageAgent(provider: ImageProviderConfig): ImageAgent {
     const client = createImageClient('images', {
         model: provider.model,
         baseUrl: provider.baseUrl || undefined,
         apiKey: provider.apiKey || undefined,
-        size: settings.imageSize,
-        quality: settings.imageQuality,
-        style: settings.imageStyle,
+        extraParams: provider.extraParams,
     });
     return {
         name: provider.id,

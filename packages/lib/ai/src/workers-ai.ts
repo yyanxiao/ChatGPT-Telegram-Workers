@@ -176,6 +176,8 @@ export class WorkersAIClient implements LLMClient {
 export interface WorkersImageOptions {
     model: string;
     prompt: string;
+    /** 模型专属生成参数(negative_prompt/width/height/num_steps/…),合并进请求体 */
+    extraParams?: Record<string, unknown>;
     /** 优先使用的绑定 */
     binding?: WorkersAIBinding;
     /** 无绑定时的 REST 凭据 */
@@ -184,12 +186,11 @@ export interface WorkersImageOptions {
     fetch?: typeof fetch;
 }
 
-/** 生成图片:有绑定走绑定,否则 POST 到 `/ai/run/{model}`,统一返回 Blob */
+/** 生成图片:有绑定走绑定,否则 POST 到 `/ai/run/{model}`,`prompt` 固定不被 extraParams 覆盖 */
 export async function generateWorkersImage(options: WorkersImageOptions): Promise<Blob> {
+    const body = { ...options.extraParams, prompt: options.prompt };
     if (options.binding) {
-        return workersImageToBlob(
-            bindingImageResponse(await options.binding.run(options.model, { prompt: options.prompt })),
-        );
+        return workersImageToBlob(bindingImageResponse(await options.binding.run(options.model, body)));
     }
     if (!options.accountId) {
         throw new Error('Cloudflare account ID is required');
@@ -201,7 +202,7 @@ export async function generateWorkersImage(options: WorkersImageOptions): Promis
             ...(options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {}),
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: options.prompt }),
+        body: JSON.stringify(body),
     });
     return workersImageToBlob(response);
 }

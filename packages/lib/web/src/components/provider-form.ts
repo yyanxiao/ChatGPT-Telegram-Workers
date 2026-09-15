@@ -8,6 +8,8 @@ type Kind = 'chat' | 'image';
 interface FormOptions {
     isDraft: boolean;
     isDefault: boolean;
+    /** 部署已绑定 Workers AI:workers 提供商的 accountId/token 变为可选 */
+    workersBinding: boolean;
     onDefault: (on: boolean) => void;
     onRemove: () => void;
 }
@@ -91,14 +93,42 @@ export class ProviderForm extends HTMLElement {
             )
             .join('');
 
+        // workers 不读取 baseUrl/apiKey,展示它们只会让人误以为必填
+        const showBaseUrl = protocol?.usesBaseUrl !== false;
+        const showApiKey = protocol?.usesApiKey !== false;
+
+        const baseUrlRow = showBaseUrl
+            ? `<div class="row-field">
+                   <span class="row-label">Base URL</span>
+                   <input class="bare" type="url" inputmode="url" data-field="baseUrl" value="${esc(p.baseUrl)}" placeholder="https://api.example.com/v1" aria-label="Base URL" />
+               </div>`
+            : '';
+        const apiKeyRow = showApiKey
+            ? `<div class="row-field">
+                   <span class="row-label">API Key</span>
+                   <input class="bare" type="password" data-field="apiKey" value="${esc(p.apiKey)}"
+                       placeholder="${p.hasApiKey && !p.clearApiKey ? 'Unchanged' : 'Required'}" autocomplete="off" aria-label="API key" />
+               </div>`
+            : '';
+
         // 已保存的 Key 提供显式清除入口:清空输入框表示「不变」,删除必须显式触发
-        const clearKeyRow = p.clearApiKey
-            ? `<button type="button" class="list-row" data-undo-clear-key>
-                   <span class="row-main"><span class="row-title">Key Will Be Removed</span><span class="row-sub">Tap to undo</span></span>
-               </button>`
-            : p.hasApiKey && !p.apiKey
-              ? `<button type="button" class="list-row destructive" data-clear-key>Clear API Key</button>`
-              : '';
+        const clearKeyRow = !showApiKey
+            ? ''
+            : p.clearApiKey
+              ? `<button type="button" class="list-row" data-undo-clear-key>
+                     <span class="row-main"><span class="row-title">Key Will Be Removed</span><span class="row-sub">Tap to undo</span></span>
+                 </button>`
+              : p.hasApiKey && !p.apiKey
+                ? `<button type="button" class="list-row destructive" data-clear-key>Clear API Key</button>`
+                : '';
+
+        // workers 有 AI 绑定时不需要 accountId/token;无绑定时才回退到凭据
+        const workersHint =
+            p.protocol === 'workers'
+                ? this.opts.workersBinding
+                    ? '<p class="group-footer">AI binding detected. Account ID and API Token are optional and only used when the binding is unavailable.</p>'
+                    : '<p class="group-footer">No AI binding on this deployment. Fill in Account ID and API Token, or add the AI binding.</p>'
+                : '';
 
         const modelRows = p.models
             .map(
@@ -173,18 +203,12 @@ export class ProviderForm extends HTMLElement {
                         <span class="row-label">API Format</span>
                         <select class="bare" data-apply-protocol aria-label="API format">${protocolOptions}</select>
                     </div>
-                    <div class="row-field">
-                        <span class="row-label">Base URL</span>
-                        <input class="bare" type="url" inputmode="url" data-field="baseUrl" value="${esc(p.baseUrl)}" placeholder="https://api.example.com/v1" aria-label="Base URL" />
-                    </div>
-                    <div class="row-field">
-                        <span class="row-label">API Key</span>
-                        <input class="bare" type="password" data-field="apiKey" value="${esc(p.apiKey)}"
-                            placeholder="${p.hasApiKey && !p.clearApiKey ? 'Unchanged' : 'Required'}" autocomplete="off" aria-label="API key" />
-                    </div>
+                    ${baseUrlRow}
+                    ${apiKeyRow}
                     ${clearKeyRow}
                     ${optionRows}
                 </section>
+                ${workersHint}
                 <p class="group-footer">API format switch resets the base URL and protocol options.</p>
 
                 <h2 class="section-h">Models</h2>
@@ -208,7 +232,7 @@ export class ProviderForm extends HTMLElement {
                 <h2 class="section-h">Extra Params</h2>
                 <section class="list-group">
                     <div class="row-stack">
-                        <span class="row-label">JSON, merged into chat completion requests</span>
+                        <span class="row-label">${this.kind === 'image' ? 'JSON, merged into image generation requests' : 'JSON, merged into chat completion requests'}</span>
                         <textarea class="bare code" data-field="extraParams" placeholder='{"key":"value"}' spellcheck="false">${esc(
                             JSON.stringify(p.extraParams || {}, null, 2),
                         )}</textarea>

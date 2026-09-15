@@ -48,21 +48,26 @@ export function createWorkersChat(provider: ChatProviderConfig, settings: AppSet
     };
 }
 
-export function createWorkersImage(provider: ImageProviderConfig): ImageAgent {
+export function createWorkersImage(provider: ImageProviderConfig): ImageAgent | null {
     const { accountId, token } = workersCredentials(provider.options);
+    const binding = ENV.AI_BINDING ?? undefined;
+    if (!binding && (!accountId || !token)) {
+        // 与聊天侧一致:未配置凭据时跳过该 provider,而不是留一个到生成时才报错的实例
+        console.warn(`Workers image provider "${provider.id}" skipped: missing AI binding or account id/token`);
+        return null;
+    }
+    const client = createImageClient('workers', {
+        model: provider.model,
+        extraParams: provider.extraParams,
+        binding,
+        accountId,
+        apiKey: token,
+    });
     return {
         name: provider.id,
         label: provider.label || 'Cloudflare Workers AI',
         model: provider.model,
         modelList: async () => provider.models,
-        generate: async prompt => {
-            const binding = ENV.AI_BINDING ?? undefined;
-            if (!binding && (!accountId || !token)) {
-                throw new Error('Cloudflare account ID and token are required');
-            }
-            return createImageClient('workers', { model: provider.model, binding, accountId, apiKey: token }).generate(
-                prompt,
-            );
-        },
+        generate: prompt => client.generate(prompt),
     };
 }

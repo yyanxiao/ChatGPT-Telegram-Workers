@@ -8,16 +8,14 @@ export interface ImageClient<P extends ImageProtocol = ImageProtocol> {
     generate: (prompt: string) => Promise<string | Blob>;
 }
 
-/** createImageClient 的配置,由调用方从 provider 与 settings 组装 */
+/** createImageClient 的配置,由调用方从 provider 组装 */
 export interface ImageClientConfig {
     model: string;
     apiKey?: string;
     baseUrl?: string;
     fetch?: typeof fetch;
-    /** openai images 参数 */
-    size?: string;
-    quality?: string;
-    style?: string;
+    /** 协议与模型专属的生成参数,合并进请求体(provider 级配置) */
+    extraParams?: Record<string, unknown>;
     /** workers 协议:优先使用的绑定 */
     binding?: WorkersAIBinding;
     /** workers 协议:无绑定时的 REST 凭据 */
@@ -25,25 +23,17 @@ export interface ImageClientConfig {
 }
 
 /**
- * OpenAI Images 协议:POST {base}/images/generations,
- * dall-e-3 追加 quality / style,返回 data[0].url。
+ * OpenAI Images 协议:POST {base}/images/generations,返回 data[0].url。
+ * `extraParams` 原样合并进请求体,`prompt`/`n`/`model` 由代码固定,不被覆盖。
  */
 async function generateOpenAIImage(config: ImageClientConfig, prompt: string): Promise<string> {
     const base = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
     const body: Record<string, unknown> = {
+        ...config.extraParams,
         prompt,
         n: 1,
-        ...(config.size ? { size: config.size } : {}),
         model: config.model,
     };
-    if (config.model === 'dall-e-3') {
-        if (config.quality) {
-            body.quality = config.quality;
-        }
-        if (config.style) {
-            body.style = config.style;
-        }
-    }
     const doFetch = config.fetch || fetch;
     const response = await doFetch(`${base}/images/generations`, {
         method: 'POST',
@@ -73,6 +63,7 @@ export function createImageClient<P extends ImageProtocol>(protocol: P, config: 
                 generateWorkersImage({
                     model: config.model,
                     prompt,
+                    extraParams: config.extraParams,
                     binding: config.binding,
                     accountId: config.accountId,
                     apiKey: config.apiKey,

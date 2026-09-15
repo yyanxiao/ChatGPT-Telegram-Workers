@@ -40,12 +40,29 @@ export interface ProtocolOption {
     optionFields?: ProviderField[];
     /** 模型列表拉取方式 */
     modelList: ModelListKind;
+    /**
+     * 该协议是否读取 `provider.baseUrl`。
+     * workers 为 false:端点由 accountId 拼接或走 AI 绑定,填了也不会被读取。
+     */
+    usesBaseUrl: boolean;
+    /**
+     * 该协议是否读取 `provider.apiKey`。
+     * workers 为 false:凭据是 options.token(或 AI 绑定),填了也不会被读取。
+     */
+    usesApiKey: boolean;
 }
 
 const WORKERS_FIELDS: ProviderField[] = [
     { key: 'accountId', label: 'Account ID', type: 'text' },
     { key: 'token', label: 'API Token', type: 'password' },
 ];
+
+/**
+ * Workers AI 的凭据与端点都不来自 Base URL / API Key:
+ * 有 `AI` 绑定时直接用绑定,否则用 options 里的 accountId + token。
+ * 因此这两个通用字段对它恒为无意义,表单不应展示。
+ */
+const WORKERS_ENDPOINT_FIELDS = { usesBaseUrl: false, usesApiKey: false } as const;
 
 /** 可选的自定义鉴权头:Azure OpenAI 使用 `api-key` 而非 Bearer */
 const API_KEY_HEADER_FIELD: ProviderField = {
@@ -62,12 +79,16 @@ export const CHAT_PROTOCOLS: ProtocolOption[] = [
         defaultBaseUrl: 'https://api.openai.com/v1',
         optionFields: [API_KEY_HEADER_FIELD],
         modelList: 'openai',
+        usesBaseUrl: true,
+        usesApiKey: true,
     },
     {
         id: 'anthropic-messages',
         label: 'Anthropic Messages',
         defaultBaseUrl: 'https://api.anthropic.com/v1',
         modelList: 'anthropic',
+        usesBaseUrl: true,
+        usesApiKey: true,
     },
     {
         id: 'responses',
@@ -75,6 +96,8 @@ export const CHAT_PROTOCOLS: ProtocolOption[] = [
         defaultBaseUrl: 'https://api.openai.com/v1',
         optionFields: [API_KEY_HEADER_FIELD],
         modelList: 'openai',
+        usesBaseUrl: true,
+        usesApiKey: true,
     },
     {
         id: 'workers',
@@ -82,6 +105,7 @@ export const CHAT_PROTOCOLS: ProtocolOption[] = [
         defaultBaseUrl: '',
         optionFields: WORKERS_FIELDS,
         modelList: 'workers',
+        ...WORKERS_ENDPOINT_FIELDS,
     },
 ];
 
@@ -91,6 +115,8 @@ export const IMAGE_PROTOCOLS: ProtocolOption[] = [
         label: 'OpenAI Images',
         defaultBaseUrl: 'https://api.openai.com/v1',
         modelList: 'openai',
+        usesBaseUrl: true,
+        usesApiKey: true,
     },
     {
         id: 'workers',
@@ -98,6 +124,7 @@ export const IMAGE_PROTOCOLS: ProtocolOption[] = [
         defaultBaseUrl: '',
         optionFields: WORKERS_FIELDS,
         modelList: 'workers',
+        ...WORKERS_ENDPOINT_FIELDS,
     },
 ];
 

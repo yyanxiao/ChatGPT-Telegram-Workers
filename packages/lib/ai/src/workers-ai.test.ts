@@ -152,19 +152,37 @@ describe('generateWorkersImage', () => {
         expect(await blob.text()).toBe('abc');
     });
 
+    it('merges extraParams into the binding body without overriding the prompt', async () => {
+        const bodies: any[] = [];
+        await generateWorkersImage({
+            model: '@cf/flux',
+            prompt: 'a cat',
+            extraParams: { prompt: 'hijacked', num_steps: 6, negative_prompt: 'blurry' },
+            binding: bindingWith(async (_model, body) => {
+                bodies.push(body);
+                return { image: 'QUJD' };
+            }),
+        });
+        expect(bodies[0]).toEqual({ prompt: 'a cat', num_steps: 6, negative_prompt: 'blurry' });
+    });
+
     it('falls back to the REST run endpoint', async () => {
         let url = '';
+        let body: any = null;
         const blob = await generateWorkersImage({
             model: '@cf/flux',
             prompt: 'a cat',
+            extraParams: { guidance: 7.5 },
             accountId: 'acct',
             apiKey: 'tok',
-            fetch: (async (input: any) => {
+            fetch: (async (input: any, init: any) => {
                 url = String(input);
+                body = JSON.parse(init.body);
                 return new Response('imagebytes', { headers: { 'content-type': 'image/png' } });
             }) as typeof fetch,
         });
         expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/acct/ai/run/@cf/flux');
+        expect(body).toEqual({ prompt: 'a cat', guidance: 7.5 });
         expect(await blob.text()).toBe('imagebytes');
     });
 

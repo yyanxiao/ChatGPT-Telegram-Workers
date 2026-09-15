@@ -35,8 +35,8 @@ Open `https://<your-domain>/admin`.
 ### Tabs
 
 - **Chat Providers** — add AI chat providers. Each provider has a Name, Base URL, API key, an **API format** (protocol) and an allowed **model list**. Use **Fetch models** to pull the list from the endpoint (ends with `/models`), then click to add models; if the endpoint has no model list, use **+ Add model** to type names manually. Pick one model as active and mark one provider as default.
-- **Image Providers** — same, for image generation.
-- **Settings** — global options that used to be environment variables: public base URL, system prompt, permissions, history limits, streaming, image defaults, …
+- **Image Providers** — same, for image generation. Generation parameters differ per protocol and model (`size`/`quality`/`style` for OpenAI, `negative_prompt`/`width`/`height`/`num_steps`/`guidance` for Workers AI models), so each provider has its own **Extra Params** JSON merged into the request body; `prompt` stays authoritative.
+- **Settings** — global options that used to be environment variables: public base URL, system prompt, permissions, history limits, streaming, …
 - **Plugins** — request-template commands (JSON template or URL) with their own env map.
 - **Custom Commands** — shortcuts. When the value starts with `/setenv`, `/setenvs`, `/delenv`, or JSON, it is applied as a config patch to the global config; otherwise it expands to another command as a text alias.
 
@@ -71,9 +71,13 @@ Providers are no longer tied to a vendor list. Choose the API format that matche
 | `chat-completions` | OpenAI Chat Completions | `/v1/chat/completions`, default for OpenAI-compatible endpoints |
 | `anthropic-messages` | Anthropic Messages | `/v1/messages` |
 | `responses` | OpenAI Responses | `/v1/responses` |
-| `workers` | Cloudflare Workers AI | uses the `AI` binding or account id + token |
+| `workers` | Cloudflare Workers AI | uses the `AI` binding, or account id + token when the binding is absent |
 
 For images, the API formats are `images` (OpenAI `/v1/images/generations`) and `workers`.
+
+The `workers` format ignores the **Base URL** and **API Key** fields — its endpoint and credentials come from the `AI` binding (or the `Account ID` / `API Token` options when no binding is deployed), so the form hides both fields for that format. When an `AI` binding is present you can leave `Account ID` and `API Token` empty and the provider still works. Without a binding, an `Account ID` + `API Token` pair is required; a provider missing both is skipped instead of failing on first use.
+
+**Fetch models** lists models through the binding when one is present, otherwise through the account-level Cloudflare API. Either way the results are split by task type, so the chat tab offers text-generation models and the image tab offers text-to-image models.
 
 Name your provider anything (e.g. `DeepSeek`, `Groq`, `Mistral`); any OpenAI-compatible endpoint works with `chat-completions`. Existing vendor-named configs (including `azure` and `gemini`) are migrated automatically on load.
 

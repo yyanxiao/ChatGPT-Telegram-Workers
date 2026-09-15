@@ -64,6 +64,8 @@ export function createAdminMethods(): RpcMethods {
             return {
                 chatProtocols: CHAT_PROTOCOLS,
                 imageProtocols: IMAGE_PROTOCOLS,
+                // 有 AI 绑定时 workers 提供商无需 accountId/token,表单据此调整提示
+                workersBinding: !!ENV.AI_BINDING,
             };
         },
 
@@ -106,8 +108,14 @@ export function createAdminMethods(): RpcMethods {
             }
             await ENV.loadConfig(true);
             try {
-                const provider = unmaskProviderFromStore(body.provider, body.kind === 'image' ? 'image' : 'chat');
-                const models = await fetchModels(provider.protocol, provider, body.kind === 'image' ? 'image' : 'chat');
+                const kind = body.kind === 'image' ? 'image' : 'chat';
+                const provider = unmaskProviderFromStore(body.provider, kind);
+                // workers 有 AI 绑定时不需要 accountId/token,把绑定透传给 fetchModels
+                const models = await fetchModels(
+                    provider.protocol,
+                    { ...provider, binding: ENV.AI_BINDING ?? undefined },
+                    kind,
+                );
                 return { models };
             } catch (e) {
                 throw new RpcError(400, (e as Error).message);

@@ -55,13 +55,22 @@ export type WorkersTextOutput = ReadableStream<Uint8Array> | { response?: string
 /** Workers AI 绑定返回:图片生成 */
 export type WorkersImageOutput = ReadableStream<Uint8Array> | { image?: string };
 
+/** Workers AI 绑定 `models()` 返回的条目;列模型只需要 name */
+export interface WorkersAIModelInfo {
+    id?: string;
+    name?: string;
+    task?: unknown;
+}
+
 /**
  * Workers AI 绑定(与 Cloudflare 的 `env.AI` 结构一致)。
  * 用结构化类型声明,binding 由调用方注入,从而 ai 包无需依赖 config。
+ * `models` 可选:早期运行时没有该方法,缺失时回退到 REST 凭据。
  */
 export interface WorkersAIBinding {
     run(model: string, body: { messages: unknown[]; stream: boolean }): Promise<WorkersTextOutput>;
     run(model: string, body: { prompt: string }): Promise<WorkersImageOutput>;
+    models?(params?: { task?: string; page?: number; per_page?: number }): Promise<WorkersAIModelInfo[]>;
 }
 
 /** 图片传输方式:URL 直传,或抓取后内联为 base64 */

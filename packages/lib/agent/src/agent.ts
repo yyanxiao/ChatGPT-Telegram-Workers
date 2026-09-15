@@ -17,11 +17,7 @@ export function buildChatAgents(config: AppConfig): ChatAgent[] {
 export function buildImageAgents(config: AppConfig): ImageAgent[] {
     return config.imageProviders
         .filter(provider => provider.enabled)
-        .map(provider =>
-            provider.protocol === 'workers'
-                ? createWorkersImage(provider)
-                : createImageAgent(provider, config.settings),
-        )
+        .map(provider => (provider.protocol === 'workers' ? createWorkersImage(provider) : createImageAgent(provider)))
         .filter((agent): agent is ImageAgent => agent !== null);
 }
 

@@ -44,11 +44,6 @@ export interface AppSettings {
     safeMode: boolean;
     debugMode: boolean;
     devMode: boolean;
-
-    // 图片生成默认参数
-    imageSize: string;
-    imageQuality: string;
-    imageStyle: string;
 }
 
 /** 聊天提供商的 API 格式(协议入口) */
@@ -75,6 +70,10 @@ export interface ChatProviderConfig {
     options: Record<string, unknown>;
 }
 
+/**
+ * 图片提供商实例。生成参数(`size`/`quality`/`style`/`negative_prompt`/…)
+ * 因协议与模型而异,不做全局配置,统一由 `extraParams` 按 provider 合并进请求体。
+ */
 export interface ImageProviderConfig {
     id: string;
     protocol: ImageProtocol;
@@ -84,6 +83,7 @@ export interface ImageProviderConfig {
     baseUrl: string;
     model: string;
     models: string[];
+    extraParams: Record<string, unknown>;
     options: Record<string, unknown>;
 }
 

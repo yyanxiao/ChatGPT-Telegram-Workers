@@ -1,5 +1,5 @@
 import type { AppConfig } from '@chatgpt-telegram-workers/config';
-import { normalizeConfig } from '@chatgpt-telegram-workers/config';
+import { ENV, normalizeConfig } from '@chatgpt-telegram-workers/config';
 import { CHAT_PROTOCOLS, chatImageSupport, findChatProtocol, IMAGE_PROTOCOLS } from '@chatgpt-telegram-workers/ai';
 import { buildChatAgents, buildImageAgents, loadChatLLM, loadImageGen } from './agent';
 
@@ -88,5 +88,51 @@ describe('loadChatLLM / loadImageGen', () => {
             }),
         );
         expect(agents.map(a => a.name)).toEqual(['img']);
+    });
+});
+
+describe('workers providers without credentials', () => {
+    const workersChat = config({
+        chatProviders: [{ id: 'wc', protocol: 'workers', model: '@cf/meta/llama-3-8b-instruct' }],
+    });
+    const workersImage = config({
+        imageProviders: [{ id: 'wi', protocol: 'workers', model: '@cf/stable-diffusion-xl' }],
+    });
+
+    afterEach(() => {
+        ENV.AI_BINDING = null as any;
+    });
+
+    it('skips chat and image providers when neither binding nor credentials exist', () => {
+        ENV.AI_BINDING = null as any;
+        // 两侧行为必须一致:都没有可用凭据时跳过,而不是留到调用时才报错
+        expect(buildChatAgents(workersChat)).toEqual([]);
+        expect(buildImageAgents(workersImage)).toEqual([]);
+        expect(loadImageGen(workersImage)).toBeNull();
+    });
+
+    it('builds both providers from the AI binding alone', () => {
+        ENV.AI_BINDING = { run: vi.fn() } as any;
+        expect(buildChatAgents(workersChat).map(a => a.name)).toEqual(['wc']);
+        expect(buildImageAgents(workersImage).map(a => a.name)).toEqual(['wi']);
+    });
+
+    it('builds both providers from account id and token alone', () => {
+        ENV.AI_BINDING = null as any;
+        const creds = { accountId: 'acc', token: 'tok' };
+        expect(
+            buildChatAgents(
+                config({
+                    chatProviders: [{ id: 'wc', protocol: 'workers', model: 'm', options: creds }],
+                }),
+            ).map(a => a.name),
+        ).toEqual(['wc']);
+        expect(
+            buildImageAgents(
+                config({
+                    imageProviders: [{ id: 'wi', protocol: 'workers', model: 'm', options: creds }],
+                }),
+            ).map(a => a.name),
+        ).toEqual(['wi']);
     });
 });

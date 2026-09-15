@@ -11,12 +11,20 @@ export class ProviderPage extends HTMLElement {
     private protocols: ProtocolOption[] = [];
     private providers: MaskedProvider[] = [];
     private defaultId: string | null = null;
+    private workersBinding = false;
 
-    configure(kind: Kind, protocols: ProtocolOption[], providers: MaskedProvider[], defaultId: string | null): void {
+    configure(
+        kind: Kind,
+        protocols: ProtocolOption[],
+        providers: MaskedProvider[],
+        defaultId: string | null,
+        workersBinding = false,
+    ): void {
         this.kind = kind;
         this.protocols = protocols;
         this.providers = providers.map(p => ({ ...p, models: [...(p.models || [])] }));
         this.defaultId = defaultId;
+        this.workersBinding = workersBinding;
         this.render();
     }
 
@@ -133,6 +141,7 @@ export class ProviderPage extends HTMLElement {
                         form.open(this.kind, this.protocols, provider, {
                             isDraft,
                             isDefault: this.defaultId === provider.id,
+                            workersBinding: this.workersBinding,
                             onDefault: (on: boolean) => {
                                 if (on) {
                                     this.defaultId = provider.id;

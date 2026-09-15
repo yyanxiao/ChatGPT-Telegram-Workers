@@ -59,6 +59,27 @@ describe('normalizeConfig', () => {
         expect(config.imageProviders[0].protocol).toBe('images');
     });
 
+    it('keeps per-provider extraParams on image providers', () => {
+        const config = normalizeConfig({
+            imageProviders: [
+                {
+                    id: 'flux',
+                    protocol: 'workers',
+                    model: '@cf/black-forest-labs/flux-1-schnell',
+                    extraParams: { num_steps: 4, width: 1024 },
+                },
+            ],
+        });
+        expect(config.imageProviders[0].extraParams).toEqual({ num_steps: 4, width: 1024 });
+    });
+
+    it('drops per-provider generation params that normalization does not know', () => {
+        const config = normalizeConfig({
+            imageProviders: [{ id: 'i', protocol: 'images', model: 'dall-e-3', size: '1792x1024' }],
+        });
+        expect(config.imageProviders[0]).not.toHaveProperty('size');
+    });
+
     it('parses legacy modelsList into the allowed models', () => {
         const config = normalizeConfig({
             chatProviders: [{ id: 'a', protocol: 'chat-completions', model: 'm1', modelsList: '["m1","m2"]' }],

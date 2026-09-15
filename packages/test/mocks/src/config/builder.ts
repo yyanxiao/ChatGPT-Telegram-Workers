@@ -57,9 +57,6 @@ export const TEST_SETTINGS = {
     safeMode: true,
     debugMode: false,
     devMode: false,
-    imageSize: '1024x1024',
-    imageQuality: 'standard',
-    imageStyle: 'vivid',
 };
 
 function provider(input: TestProviderOverrides) {
@@ -80,8 +77,7 @@ function provider(input: TestProviderOverrides) {
 }
 
 function imageProvider(input: TestProviderOverrides) {
-    const { extraParams: _extraParams, ...rest } = provider(input);
-    return { ...rest, protocol: input.protocol ?? 'images' };
+    return { ...provider(input), protocol: input.protocol ?? 'images' };
 }
 
 /** 构造一份可直接交给 `admin.config.save` 的配置 */

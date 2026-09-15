@@ -731,7 +731,13 @@ async function run(): Promise<void> {
             await harness.applyConfig({
                 settings: { allowedUserIds: [`${ADMIN_ID}`], streamMode: false },
                 imageProviders: [
-                    { id: 'mock-image', protocol: 'images', baseUrl: `${llmUrl}/v1`, model: 'mock-image-model' },
+                    {
+                        id: 'mock-image',
+                        protocol: 'images',
+                        baseUrl: `${llmUrl}/v1`,
+                        model: 'mock-image-model',
+                        extraParams: { size: '1792x1024', quality: 'hd' },
+                    },
                 ],
             });
             telegram.reset();
@@ -744,6 +750,8 @@ async function run(): Promise<void> {
             s.expect('image endpoint called', !!imageRequest);
             s.expectEq('prompt forwarded', imageRequest?.prompt, 'a cat wearing a hat');
             s.expectEq('configured image model used', imageRequest?.model, 'mock-image-model');
+            s.expectEq('provider extraParams merged into the request', imageRequest?.size, '1792x1024');
+            s.expectEq('provider extraParams merged into the request', imageRequest?.quality, 'hd');
             s.expect('photo sent back', telegram.callsFor('sendPhoto').length >= 1);
             s.finish();
         }

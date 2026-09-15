@@ -30,6 +30,23 @@ describe('protocol registry', () => {
         expect(isImageProtocol('images')).toBe(true);
         expect(isImageProtocol('responses')).toBe(false);
     });
+
+    it('marks workers as not using base URL or API key', () => {
+        // workers 的端点和凭据来自 accountId/token 或 AI 绑定,通用字段恒为死字段
+        for (const protocol of [...CHAT_PROTOCOLS, ...IMAGE_PROTOCOLS].filter(p => p.id === 'workers')) {
+            expect(protocol.usesBaseUrl).toBe(false);
+            expect(protocol.usesApiKey).toBe(false);
+        }
+    });
+
+    it('marks HTTP protocols as using base URL and API key', () => {
+        for (const id of ['chat-completions', 'anthropic-messages', 'responses']) {
+            expect(findChatProtocol(id)?.usesBaseUrl).toBe(true);
+            expect(findChatProtocol(id)?.usesApiKey).toBe(true);
+        }
+        expect(findImageProtocol('images')?.usesBaseUrl).toBe(true);
+        expect(findImageProtocol('images')?.usesApiKey).toBe(true);
+    });
 });
 
 describe('chatImageSupport', () => {

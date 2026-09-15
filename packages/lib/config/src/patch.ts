@@ -32,9 +32,6 @@ export const GROUP_ADMIN_SETTINGS_KEYS = new Set<string>([
     'extraMessageContext',
     'extraMessageMediaCompatible',
     'hideCommandButtons',
-    'imageSize',
-    'imageQuality',
-    'imageStyle',
 ]);
 
 /**

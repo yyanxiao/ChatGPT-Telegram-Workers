@@ -34,8 +34,8 @@
 ### 标签页
 
 - **Chat Providers** —— 添加聊天 AI 提供商。每个提供商填写 Name、Base URL、API Key、**API format**(协议)与**允许使用的模型列表**。点 **Fetch models** 可从端点(以 `/models` 结尾)拉取模型并点选加入;端点不支持模型列表时用 **+ Add model** 手动输入。选中一个模型作为当前使用项,并指定默认提供商。
-- **Image Providers** —— 同上,用于图片生成。
-- **Settings** —— 原环境变量形式的全局选项:公网 Base URL、系统提示词、权限、历史长度、流式、图片默认参数等。
+- **Image Providers** —— 同上,用于图片生成。生成参数因协议和模型而异(OpenAI 的 `size`/`quality`/`style`,Workers AI 各模型的 `negative_prompt`/`width`/`height`/`num_steps`/`guidance` 等),因此每个 provider 有自己的 **Extra Params** JSON,合并进请求体;`prompt` 始终以代码传入值为准。
+- **Settings** —— 原环境变量形式的全局选项:公网 Base URL、系统提示词、权限、历史长度、流式等。
 - **Plugins** —— 请求模板命令(JSON 模板或 URL),可带独立的环境变量映射。
 - **Custom Commands** —— 快捷指令。Value 以 `/setenv`、`/setenvs`、`/delenv` 或 JSON 开头时,作为配置补丁写回全局配置;其余按文本别名展开为另一条命令。
 
@@ -70,9 +70,13 @@ Custom Commands 可以直接修改全局配置,用来快速切换默认提供商
 | `chat-completions` | OpenAI Chat Completions | `/v1/chat/completions`,OpenAI 兼容端点默认选它 |
 | `anthropic-messages` | Anthropic Messages | `/v1/messages` |
 | `responses` | OpenAI Responses | `/v1/responses` |
-| `workers` | Cloudflare Workers AI | 使用 `AI` 绑定或 account id + token |
+| `workers` | Cloudflare Workers AI | 使用 `AI` 绑定;无绑定时回退 account id + token |
 
 图片的 API format 为 `images`(OpenAI `/v1/images/generations`)与 `workers`。
+
+`workers` 不读取 **Base URL** 与 **API Key**:端点和凭据来自 `AI` 绑定(无绑定时用 `Account ID` / `API Token` 两个协议字段),因此表单不会展示这两个通用字段。已部署 `AI` 绑定时,`Account ID` 与 `API Token` 均可留空、提供商即可正常工作;无绑定时必须填 `Account ID` + `API Token`,两者都缺的 provider 会被跳过,而不是留到首次调用才报错。
+
+**Fetch models** 在有绑定时通过绑定列模型,否则回退到账号级 Cloudflare API;两种方式都会按任务类型区分,聊天页只给文本生成模型,图片页只给图片生成模型。
 
 Name 可任意填写(如 `DeepSeek`、`Groq`、`Mistral`),任何 OpenAI 兼容端点都用 `chat-completions`。旧的厂商命名配置在加载时会自动迁移。
 

@@ -190,6 +190,7 @@ function normalizeImageProvider(raw: any, index: number): ImageProviderConfig | 
         baseUrl: asString(raw.baseUrl),
         model: activeModel(raw, models),
         models,
+        extraParams: asRecord(raw.extraParams),
         options: asRecord(raw.options),
     };
 }
@@ -288,7 +289,7 @@ function maskProvider(provider: ChatProviderConfig | ImageProviderConfig): Maske
         baseUrl: provider.baseUrl,
         model: provider.model,
         models: provider.models,
-        extraParams: 'extraParams' in provider ? provider.extraParams : {},
+        extraParams: provider.extraParams,
         options: maskSecrets(provider.options),
     };
 }
