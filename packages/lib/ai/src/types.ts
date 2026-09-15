@@ -1,3 +1,4 @@
+import type { Ai, AiModelsSearchObject, AiModelsSearchParams } from '@cloudflare/workers-types';
 import type { ChatProtocol } from './protocols';
 
 export type ImageInput = string | URL | Uint8Array;
@@ -50,28 +51,48 @@ export interface CompletionResult {
 /** 聊天协议标识(与 protocols.ts 的 ChatProtocol 同一来源) */
 export type Protocol = ChatProtocol;
 
-/** Workers AI 绑定返回:文本生成 */
-export type WorkersTextOutput = ReadableStream<Uint8Array> | { response?: string };
-/** Workers AI 绑定返回:图片生成 */
-export type WorkersImageOutput = ReadableStream<Uint8Array> | { image?: string };
-
-/** Workers AI 绑定 `models()` 返回的条目;列模型只需要 name */
-export interface WorkersAIModelInfo {
-    id?: string;
-    name?: string;
-    task?: unknown;
-}
+/**
+ * `models()` 返回的条目。字段取自官方 `AiModelsSearchObject`(来源变更会在编译期暴露),
+ * 但整体保持宽松:绑定与账号级 REST 搜索共用此形状,后者是不受信任的 JSON,
+ * 因此字段可选、`task` 不做收窄,由解析方按运行时形状判断。
+ */
+export type WorkersAIModelInfo = Partial<Pick<AiModelsSearchObject, 'id' | 'name'>> & { task?: unknown };
 
 /**
- * Workers AI 绑定(与 Cloudflare 的 `env.AI` 结构一致)。
- * 用结构化类型声明,binding 由调用方注入,从而 ai 包无需依赖 config。
- * `models` 可选:早期运行时没有该方法,缺失时回退到 REST 凭据。
+ * 需要 multipart 信封的图片输入(flux-2 系列等)。
+ * `body` 是 FormData 编码后的流,`contentType` 必须带上与之一致的 boundary,
+ * 否则 Cloudflare 会以 5006 "required properties at '/' are 'multipart'" 拒绝。
+ *
+ * 必须是 type 而非 interface:interface 没有隐式索引签名,无法赋给官方 `Ai.run`
+ * 兜底重载的 `Record<string, unknown>` 参数。
  */
-export interface WorkersAIBinding {
-    run(model: string, body: { messages: unknown[]; stream: boolean }): Promise<WorkersTextOutput>;
-    run(model: string, body: { prompt: string }): Promise<WorkersImageOutput>;
-    models?(params?: { task?: string; page?: number; per_page?: number }): Promise<WorkersAIModelInfo[]>;
-}
+export type WorkersImageMultipartInput = {
+    multipart: {
+        body: ReadableStream<Uint8Array>;
+        contentType?: string | null;
+    };
+};
+
+/** 扁平的图片生成参数,至少含 prompt */
+export type WorkersImageParams = { prompt: string } & Record<string, unknown>;
+
+/**
+ * 图片生成输入:
+ * - 普通模型是扁平的生成参数(至少含 prompt);
+ * - 输入 schema 要求 `multipart` 的模型必须用信封包裹(见上)。
+ */
+export type WorkersImageInput = WorkersImageParams | WorkersImageMultipartInput;
+
+/**
+ * Workers AI 绑定:直接以官方 `@cloudflare/workers-types` 的 `Ai` 为基础,
+ * 不再手写 `run` 的结构体,模型与输入/输出的定义始终与 Cloudflare 对齐。
+ *
+ * 只取实际用到的成员:`models` 保持可选(老运行时可能没有该方法,缺失时回退到
+ * 账户级 REST 列表)。官方 `Ai` 满足此类型,由 types.test.ts 的编译期断言守护。
+ */
+export type WorkersAIBinding = Pick<Ai, 'run'> & {
+    models?(params?: AiModelsSearchParams): Promise<WorkersAIModelInfo[]>;
+};
 
 /** 图片传输方式:URL 直传,或抓取后内联为 base64 */
 export type ImageTransfer = 'url' | 'base64';

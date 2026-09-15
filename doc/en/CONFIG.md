@@ -79,6 +79,8 @@ The `workers` format ignores the **Base URL** and **API Key** fields — its end
 
 **Fetch models** lists models through the binding when one is present, otherwise through the account-level Cloudflare API. Either way the results are split by task type, so the chat tab offers text-generation models and the image tab offers text-to-image models.
 
+Some newer image models — the `@cf/black-forest-labs/flux-2-*` family — accept only a `multipart/form-data` body, not JSON, so a plain JSON request fails with `5006: required properties at '/' are 'multipart'`. The bot detects those models and encodes the request as multipart automatically; if you hit that error on a model not yet covered, it retries as multipart once and remembers the model.
+
 Name your provider anything (e.g. `DeepSeek`, `Groq`, `Mistral`); any OpenAI-compatible endpoint works with `chat-completions`. Existing vendor-named configs (including `azure` and `gemini`) are migrated automatically on load.
 
 Azure OpenAI expects the key in an `api-key` header rather than `Authorization: Bearer`. Set the provider's **API Key Header** option to `api-key`; leave it empty for every other provider.

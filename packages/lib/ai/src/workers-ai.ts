@@ -7,8 +7,8 @@ import type {
     Protocol,
     SSEParseResult,
     WorkersAIBinding,
-    WorkersImageOutput,
-    WorkersTextOutput,
+    WorkersImageMultipartInput,
+    WorkersImageParams,
 } from './types';
 import { buildChatCompletionsBody, ChatCompletionsClient } from './chat-completions';
 import { parseJSONSync } from './fetch';
@@ -53,7 +53,8 @@ export function parseWorkersSSE(sse: SSEMessage): SSEParseResult {
     return typeof delta === 'string' ? { delta } : {};
 }
 
-async function* bindingTextStream(output: WorkersTextOutput): AsyncIterable<string> {
+/** 绑定输出在动态模型名下属 `Record<string, unknown>`,统一按运行时形状收窄 */
+async function* bindingTextStream(output: unknown): AsyncIterable<string> {
     if (!(output instanceof ReadableStream)) {
         yield* bindingOutputToText(output);
         return;
@@ -74,7 +75,7 @@ async function* bindingTextStream(output: WorkersTextOutput): AsyncIterable<stri
 }
 
 /** 非流式绑定输出:优先文本,失败时抛出 Cloudflare 的错误信息 */
-function bindingOutputToText(output: WorkersTextOutput): string {
+function bindingOutputToText(output: unknown): string {
     const error = (output as { errors?: Array<{ message?: string }> }).errors?.[0]?.message;
     if (error) {
         throw new Error(error);
@@ -82,10 +83,11 @@ function bindingOutputToText(output: WorkersTextOutput): string {
     if (output instanceof ReadableStream) {
         throw new Error('Unexpected streaming output for a non-streaming request');
     }
-    return output.response ?? '';
+    const response = (output as { response?: unknown }).response;
+    return typeof response === 'string' ? response : '';
 }
 
-function bindingImageResponse(output: WorkersImageOutput): Response {
+function bindingImageResponse(output: unknown): Response {
     if (output instanceof ReadableStream) {
         return new Response(output, { headers: { 'content-type': 'image/jpeg' } });
     }
@@ -186,23 +188,122 @@ export interface WorkersImageOptions {
     fetch?: typeof fetch;
 }
 
+/** 已知只接受 multipart 的模型族(见 Cloudflare 输入 schema);按前缀匹配以便覆盖新变体 */
+const MULTIPART_MODEL_PREFIXES = ['@cf/black-forest-labs/flux-2-'];
+
+/**
+ * 运行时确认过需要 multipart 的模型。命中前缀之外的模型时先按扁平参数发送,
+ * 服务端报 multipart 错误再重试并记入此处,后续调用不再多花一次往返。
+ */
+const MULTIPART_MODEL_CACHE = new Set<string>();
+
+/** 识别"该模型要求 multipart 信封"的服务端报错(5006 / required properties at '/' are 'multipart') */
+function isMultipartRequiredError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /multipart/i.test(message) && /required\s+propert/i.test(message);
+}
+
+function needsMultipart(model: string): boolean {
+    return MULTIPART_MODEL_CACHE.has(model) || MULTIPART_MODEL_PREFIXES.some(prefix => model.startsWith(prefix));
+}
+
+/** 把生成参数编成 FormData(跳过空值,否则会被序列化成字符串 "undefined") */
+function toImageFormData(body: WorkersImageParams): FormData {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(body)) {
+        if (value === undefined || value === null || value === '') {
+            continue;
+        }
+        form.append(key, String(value));
+    }
+    return form;
+}
+
+/**
+ * 把生成参数编成 multipart 信封:FormData 序列化后取流与带 boundary 的 content-type。
+ * 直接手写 boundary 容易与服务端不一致,交给 Response/FormData 生成最稳妥。
+ */
+export function workersImageMultipartInput(body: WorkersImageParams): WorkersImageMultipartInput {
+    const response = new Response(toImageFormData(body));
+    return {
+        multipart: {
+            body: response.body as ReadableStream<Uint8Array>,
+            contentType: response.headers.get('content-type'),
+        },
+    };
+}
+
+/** 从 REST 错误响应里取出 Cloudflare 的错误文案,便于给用户可读提示 */
+async function restErrorDetail(response: Response): Promise<string> {
+    const fallback = `Cloudflare Workers AI request failed: ${response.status} ${response.statusText}`;
+    try {
+        const data: any = await response.json();
+        const error = data?.errors?.[0];
+        if (error?.message) {
+            return error.code ? `${error.code}: ${error.message}` : String(error.message);
+        }
+    } catch {
+        // 保留状态文本
+    }
+    return fallback;
+}
+
+/** 走绑定生成图片:模型需要 multipart 时直接用信封,否则先发扁平参数 */
+async function generateViaBinding(options: WorkersImageOptions, body: WorkersImageParams) {
+    const binding = options.binding!;
+    if (needsMultipart(options.model)) {
+        return binding.run(options.model, workersImageMultipartInput(body));
+    }
+    try {
+        return await binding.run(options.model, body);
+    } catch (e) {
+        if (!isMultipartRequiredError(e)) {
+            throw e;
+        }
+        MULTIPART_MODEL_CACHE.add(options.model);
+        return binding.run(options.model, workersImageMultipartInput(body));
+    }
+}
+
+/** 走 REST 生成图片:multipart 用 FormData(不设 Content-Type,交给 fetch 带 boundary) */
+async function generateViaRest(options: WorkersImageOptions, body: WorkersImageParams): Promise<Response> {
+    const doFetch = options.fetch || fetch;
+    const url = workersImageRunUrl(options.accountId!, options.model);
+    const auth: Record<string, string> = options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {};
+
+    if (needsMultipart(options.model)) {
+        return doFetch(url, { method: 'POST', headers: auth, body: toImageFormData(body) });
+    }
+
+    const response = await doFetch(url, {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (response.ok) {
+        return response;
+    }
+    const detail = await restErrorDetail(response.clone());
+    if (!isMultipartRequiredError(detail)) {
+        throw new Error(detail);
+    }
+    // 该模型只认 multipart,用 FormData 重发一次
+    MULTIPART_MODEL_CACHE.add(options.model);
+    return doFetch(url, { method: 'POST', headers: auth, body: toImageFormData(body) });
+}
+
 /** 生成图片:有绑定走绑定,否则 POST 到 `/ai/run/{model}`,`prompt` 固定不被 extraParams 覆盖 */
 export async function generateWorkersImage(options: WorkersImageOptions): Promise<Blob> {
     const body = { ...options.extraParams, prompt: options.prompt };
     if (options.binding) {
-        return workersImageToBlob(bindingImageResponse(await options.binding.run(options.model, body)));
+        return workersImageToBlob(bindingImageResponse(await generateViaBinding(options, body)));
     }
     if (!options.accountId) {
         throw new Error('Cloudflare account ID is required');
     }
-    const doFetch = options.fetch || fetch;
-    const response = await doFetch(workersImageRunUrl(options.accountId, options.model), {
-        method: 'POST',
-        headers: {
-            ...(options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {}),
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-    });
+    const response = await generateViaRest(options, body);
+    if (!response.ok) {
+        throw new Error(await restErrorDetail(response.clone()));
+    }
     return workersImageToBlob(response);
 }

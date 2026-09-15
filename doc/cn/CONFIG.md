@@ -78,6 +78,8 @@ Custom Commands 可以直接修改全局配置,用来快速切换默认提供商
 
 **Fetch models** 在有绑定时通过绑定列模型,否则回退到账号级 Cloudflare API;两种方式都会按任务类型区分,聊天页只给文本生成模型,图片页只给图片生成模型。
 
+部分较新的图片模型(`@cf/black-forest-labs/flux-2-*` 系列)只接受 `multipart/form-data` 请求体、不接受 JSON,用 JSON 会报 `5006: required properties at '/' are 'multipart'`。机器人会自动识别这些模型并按 multipart 编码;如果某个尚未覆盖的模型也报这个错,会自动改用 multipart 重试一次并记住它。
+
 Name 可任意填写(如 `DeepSeek`、`Groq`、`Mistral`),任何 OpenAI 兼容端点都用 `chat-completions`。旧的厂商命名配置在加载时会自动迁移。
 
 ## 3. `/init`
