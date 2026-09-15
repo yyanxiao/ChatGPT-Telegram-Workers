@@ -65,6 +65,7 @@ The repository ships a [wrangler.jsonc](../../wrangler.jsonc). For CLI deploys, 
     "name": "chatgpt-telegram-workers",
     "main": "./packages/apps/workers/src/index.ts",
     "compatibility_date": "2026-08-04",
+    "ai": { "binding": "AI" },
     "kv_namespaces": [{ "binding": "DATABASE", "id": "<your-kv-namespace-id>" }],
     "vars": {
         "TELEGRAM_TOKEN": "<your-bot-token>",
@@ -73,6 +74,8 @@ The repository ships a [wrangler.jsonc](../../wrangler.jsonc). For CLI deploys, 
     },
 }
 ```
+
+The `ai` binding is already in the shipped file — keep it if you want to use Cloudflare Workers AI models without an account id and API token. Bindings are reconciled from this file on every `wrangler deploy`, so adding the binding **only** in the dashboard is not enough: the next CLI deploy removes it.
 
 > Only `TELEGRAM_TOKEN` (required), `ADMIN_ID` and `ADMIN_PASSWORD` (optional) exist. Everything else — AI providers, prompts, permissions, plugins — is configured in the admin panel, see [Configuration](CONFIG.md).
 
@@ -114,6 +117,8 @@ The Worker is deployed but won't respond until it knows your bot token. In the W
 
 Then **retry the build** (or push any commit) so the new variables take effect. The committed config declares `keep_vars: true` and contains no `vars`, so dashboard variables survive every deploy.
 
+> `keep_vars` protects variables and secrets only — **not** bindings. Bindings are reconciled from the config file on every deploy, so if you add the `AI` binding in the dashboard it will disappear again on the next build. It is already declared in the committed [wrangler.jsonc](../../wrangler.jsonc), so Cloudflare Workers AI works without any extra step; to remove it, delete the `ai` entry from that file.
+
 ### Finish
 
 1. Open `https://<worker-name>.<subdomain>.workers.dev/` and click **Bind Webhook** (or visit `/init` once).
@@ -130,6 +135,7 @@ If you don't want to run anything locally — this is the only deployment that u
 3. Go to the Worker's **Settings**:
    - *Compatibility date*: set it to `2026-08-04` or later — Node.js compatibility is enabled by default from this date, no flags needed.
    - *Bindings* → add a **KV Namespace** binding, variable name must be `DATABASE`.
+   - *Bindings* → add an **AI** binding, variable name must be `AI` — only needed for Cloudflare Workers AI models; skip it if you use `Account ID` + `API Token` instead.
    - *Variables and Secrets* → add `TELEGRAM_TOKEN` (and optionally `ADMIN_ID`, `ADMIN_PASSWORD`).
 4. Redeploy so the new settings take effect.
 

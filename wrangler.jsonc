@@ -23,6 +23,12 @@
     // Never delete dashboard variables on deploy (secrets are always preserved).
     "keep_vars": true,
 
+    // Workers AI binding, used by the `workers` API format in the admin panel.
+    // Declared here rather than added in the dashboard: `wrangler deploy` reconciles
+    // bindings from this file, so a dashboard-only binding is dropped on the next
+    // deploy (keep_vars above only protects vars/secrets, not bindings).
+    "ai": { "binding": "AI" },
+
     // `local` is the wrangler dev placeholder for "not configured" and passes config
     // validation. Cloudflare Workers Builds replaces it via the DEPLOY_KV_NAMESPACE_ID
     // build variable; CLI deploys replace it with a real id here.

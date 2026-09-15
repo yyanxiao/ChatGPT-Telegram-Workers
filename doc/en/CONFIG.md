@@ -20,7 +20,7 @@ Bindings (Cloudflare / runtime):
 | Binding | Required | Description |
 |---|---|---|
 | `DATABASE` | yes | KV namespace used for bot history, caches and the global config JSON. |
-| `AI` | no | Workers AI binding, required only if you use the `workers` provider. |
+| `AI` | no | Workers AI binding, declared in the shipped `wrangler.jsonc`. Needed only if you use the `workers` provider *and* want to skip the account id + token. |
 | `API_GUARD` | no | Optional Worker used to protect the webhook (`/telegram/:token/safehook`). |
 
 > All previously supported environment variables (`OPENAI_API_KEY`, `TELEGRAM_AVAILABLE_TOKENS`, `LOCK_USER_CONFIG_KEYS`, `CUSTOM_COMMAND_*`, `PLUGIN_COMMAND_*`, …) are **removed**. Configure providers and options in the admin panel instead.

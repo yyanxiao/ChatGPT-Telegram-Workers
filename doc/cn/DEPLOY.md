@@ -65,6 +65,7 @@ pnpm wrangler kv namespace create DATABASE
     "name": "chatgpt-telegram-workers",
     "main": "./packages/apps/workers/src/index.ts",
     "compatibility_date": "2026-08-04",
+    "ai": { "binding": "AI" },
     "kv_namespaces": [{ "binding": "DATABASE", "id": "<你的KV-namespace-id>" }],
     "vars": {
         "TELEGRAM_TOKEN": "<你的Bot-Token>",
@@ -73,6 +74,8 @@ pnpm wrangler kv namespace create DATABASE
     },
 }
 ```
+
+`ai` 绑定仓库里已经带上了 —— 保留它,Cloudflare Workers AI 模型就无需再填 account id 和 API token。每次 `wrangler deploy` 都会按这个文件重建绑定,所以只在控制台添加绑定是没用的:下一次命令行部署就会把它删掉。
 
 > 环境变量只有 `TELEGRAM_TOKEN`(必填)、`ADMIN_ID`、`ADMIN_PASSWORD`(可选)三个。其余配置 —— AI 服务商、提示词、权限、插件 —— 全部在管理面板里设置,详见[配置文档](CONFIG.md)。
 
@@ -114,6 +117,8 @@ Worker 部署完成后还不会响应消息,需要告诉它 Bot Token。在 Work
 
 然后 **Retry build**(或随便 push 一个 commit)使新变量生效。仓库里的配置声明了 `keep_vars: true` 且不包含 `vars`,所以每次部署都不会覆盖或删除控制台里的变量。
 
+> `keep_vars` 只保护变量和密钥,**不保护绑定**。绑定每次部署都会按配置文件重建,所以在控制台里加 `AI` 绑定会在下次构建时丢失。仓库的 [wrangler.jsonc](../../wrangler.jsonc) 已经声明了它,Cloudflare Workers AI 开箱可用;想去掉就删掉该文件里的 `ai` 一项。
+
 ### 收尾
 
 1. 打开 `https://<worker名>.<子域>.workers.dev/`,点击 **Bind Webhook**(或访问一次 `/init`)。
@@ -130,6 +135,7 @@ Worker 部署完成后还不会响应消息,需要告诉它 Bot Token。在 Work
 3. 进入 Worker 的 **Settings**:
    - *Compatibility date*:设置为 `2026-08-04` 或更晚 —— 从该日期起 Node.js 兼容默认启用,无需任何兼容性标志。
    - *Bindings* → 添加 **KV Namespace** 绑定,变量名必须是 `DATABASE`。
+   - *Bindings* → 添加 **AI** 绑定,变量名必须是 `AI` —— 只有用 Cloudflare Workers AI 模型时才需要;改用 `Account ID` + `API Token` 可以跳过。
    - *Variables and Secrets* → 添加 `TELEGRAM_TOKEN`(以及可选的 `ADMIN_ID`、`ADMIN_PASSWORD`)。
 4. 重新部署使新设置生效。
 

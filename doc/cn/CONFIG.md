@@ -19,7 +19,7 @@
 | 绑定 | 必填 | 说明 |
 |---|---|---|
 | `DATABASE` | 是 | KV 命名空间,用于聊天历史、缓存与全局配置 JSON。 |
-| `AI` | 否 | Workers AI 绑定,仅在使用 `workers` 提供商时需要。 |
+| `AI` | 否 | Workers AI 绑定,仓库自带的 `wrangler.jsonc` 已声明。仅在使用 `workers` 提供商、且不想填 account id + token 时需要。 |
 | `API_GUARD` | 否 | 可选的 worker,用于保护 webhook(`/telegram/:token/safehook`)。 |
 
 > 原有环境变量(`OPENAI_API_KEY`、`TELEGRAM_AVAILABLE_TOKENS`、`LOCK_USER_CONFIG_KEYS`、`CUSTOM_COMMAND_*`、`PLUGIN_COMMAND_*` 等)**已全部移除**,请在管理后台中配置。
