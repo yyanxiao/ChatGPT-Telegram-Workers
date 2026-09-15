@@ -193,13 +193,17 @@ async function run(): Promise<void> {
             s.expectEq('bad secret token is 403', forbidden.status, 403);
             s.expectEq('no outbound for bad secret', telegram.sentFor(999).length, 0);
 
-            // 服务消息(入群)→ 静默忽略
+            // 服务消息(入群)→ 静默忽略;错误响应经 makeResponse200 改写为 200,
+            // 且必须保留原始响应头(不能因对象展开 Headers 而丢失 content-type)
             telegram.reset();
-            await botClient.sendUpdate(
+            const svc = await botClient.sendUpdate(
                 serviceMessage({ chatId: GROUP_ID, chatType: 'supergroup', userId: 5 }),
                 SECRET_TOKEN,
             );
             s.expectEq('service message ignored', telegram.sentFor(GROUP_ID).length, 0);
+            s.expectEq('webhook error rewritten to 200', svc.status, 200);
+            s.expectEq('original status preserved', svc.headers.get('Original-Status'), '500');
+            s.expect('rewritten response keeps content-type', !!svc.headers.get('content-type'));
 
             // 未开启的群(不在白名单)→ 拒绝
             telegram.reset();
@@ -480,6 +484,183 @@ async function run(): Promise<void> {
                 SECRET_TOKEN,
             );
             s.expectEq('delenv reset to default', (await botClient.getConfig()).settings.systemInitMessage, null);
+            s.finish();
+        }
+
+        // ------------------------------------- 9b. 群管理员配置写入权限边界(安全回归)
+        {
+            const s = new Scenario('group admin config authority');
+            const GROUP_ADMIN = 2002;
+            await harness.applyConfig({
+                settings: {
+                    allowedUserIds: [`${WHITELIST_USER}`],
+                    allowedGroupIds: [`${GROUP_ID}`],
+                    groupChatBotShareMode: false,
+                },
+                customCommands: [
+                    {
+                        id: 'setenv',
+                        command: '/setu',
+                        description: 'set language',
+                        scope: [],
+                        value: '/setenv settings.language=en',
+                        enabled: true,
+                    },
+                ],
+            });
+            telegram.addMember(GROUP_ID, { userId: GROUP_ADMIN, status: 'administrator' });
+            const apiDomainBefore = (await botClient.getConfig()).settings.telegramApiDomain;
+
+            // 群管理员:凭据/传输/访问控制/指令类键必须被拒(安全审核 finding 1 / 7)
+            for (const key of [
+                'telegramApiDomain',
+                'publicBaseUrl',
+                'systemInitMessage',
+                'allowAllUsers',
+                'safeMode',
+            ]) {
+                telegram.reset();
+                await botClient.sendUpdate(
+                    groupCommand({
+                        chatId: GROUP_ID,
+                        chatType: 'supergroup',
+                        userId: GROUP_ADMIN,
+                        command: `/setenv settings.${key}=1`,
+                    }),
+                    SECRET_TOKEN,
+                );
+                s.expectIncludes(
+                    `group admin denied settings.${key}`,
+                    telegram.lastText(GROUP_ID),
+                    'not permitted for group admins',
+                );
+            }
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenvs {"plugins":[{"id":"pwn","command":"/pwn","template":"{}"}]}`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin denied plugin injection',
+                telegram.lastText(GROUP_ID),
+                'not permitted for group admins',
+            );
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv chatProviders.mock-chat.baseUrl=https://evil.example/v1`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin denied provider baseUrl',
+                telegram.lastText(GROUP_ID),
+                'not permitted for group admins',
+            );
+            // 复核补强:改协议(confused-deputy,会把已存凭据发往别的默认主机)同样被拒
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv chatProviders.mock-chat.protocol=anthropic-messages`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin denied provider protocol',
+                telegram.lastText(GROUP_ID),
+                'not permitted for group admins',
+            );
+            // 复核补强:updateBranch 会拼进 GitHub 出站 fetch(可被目录穿越),必须被拒
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv settings.updateBranch=evil`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin denied settings.updateBranch',
+                telegram.lastText(GROUP_ID),
+                'not permitted for group admins',
+            );
+            // 复核补强:historyImagePlaceholder 会进入所有会话的模型上下文
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv settings.historyImagePlaceholder=inject`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin denied historyImagePlaceholder',
+                telegram.lastText(GROUP_ID),
+                'not permitted for group admins',
+            );
+            s.expectEq(
+                'rejected patch did not persist',
+                (await botClient.getConfig()).settings.telegramApiDomain,
+                apiDomainBefore,
+            );
+
+            // 合法委派必须保留:切换默认 provider 仍成功
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv defaultChatProvider=mock-chat`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'group admin default switch applied',
+                telegram.lastText(GROUP_ID),
+                'Update config success',
+            );
+            s.expectEq('default switch persisted', (await botClient.getConfig()).defaultChatProvider, 'mock-chat');
+
+            // 合法委派必须保留:切换已有 provider 的 model 仍成功
+            telegram.reset();
+            await botClient.sendUpdate(
+                groupCommand({
+                    chatId: GROUP_ID,
+                    chatType: 'supergroup',
+                    userId: GROUP_ADMIN,
+                    command: `/setenv chatProviders.mock-chat.model=mock-model-2`,
+                }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes('group admin model switch applied', telegram.lastText(GROUP_ID), 'Update config success');
+
+            // 非管理员触发的自定义配置快捷指令按调用者身份被拒
+            telegram.reset();
+            await botClient.sendUpdate(
+                textMessage({ chatId: WHITELIST_USER, userId: WHITELIST_USER, text: '/setu' }),
+                SECRET_TOKEN,
+            );
+            s.expectIncludes(
+                'custom shortcut by non-admin denied',
+                telegram.lastText(WHITELIST_USER),
+                'Permission denied',
+            );
             s.finish();
         }
 

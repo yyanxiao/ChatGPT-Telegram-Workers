@@ -8,6 +8,52 @@ const LIST_KEYS = ['chatProviders', 'imageProviders', 'plugins', 'customCommands
 /** 允许补丁覆盖的顶层字段 */
 const TOP_LEVEL_KEYS = new Set(['defaultChatProvider', 'defaultImageProvider', 'settings', ...LIST_KEYS]);
 
+/** 写入者角色:operator 仅 ADMIN_ID;group_admin 为群管理员/群主 */
+export type ConfigPatchRole = 'operator' | 'group_admin';
+
+/**
+ * 群管理员可写的 settings 白名单:仅限展示/生成类,不影响出站目标、凭据、
+ * 访问控制或模型指令。白名单之外(含新增字段)一律视为 operator-only,
+ * 避免用「黑名单」漏掉后续新增的危险键(见安全审核 finding 1 / 7)。
+ */
+export const GROUP_ADMIN_SETTINGS_KEYS = new Set<string>([
+    'language',
+    'defaultParseMode',
+    'streamMode',
+    'chatCompleteApiTimeout',
+    'maxOutputTokens',
+    'telegramMinStreamInterval',
+    'telegramPhotoSizeOffset',
+    'modelListColumns',
+    'autoTrimHistory',
+    'maxHistoryLength',
+    'maxTokenLength',
+    'showReplyButton',
+    'extraMessageContext',
+    'extraMessageMediaCompatible',
+    'hideCommandButtons',
+    'imageSize',
+    'imageQuality',
+    'imageStyle',
+]);
+
+/**
+ * 群管理员可改的 provider 字段白名单:仅模型选择与展示名。
+ * protocol/enabled/apiKey/baseUrl/options/extraParams 等会改变出站协议、
+ * 目标、凭据或请求体的字段一律 operator-only。
+ */
+export const GROUP_ADMIN_PROVIDER_FIELDS = new Set<string>(['model', 'models', 'label']);
+
+/** 群管理员可写的顶层键:默认 provider/model 切换 + 受限的 settings/provider 字段;
+ *  plugins/customCommands 等不在白名单内的顶层键一律拒绝 */
+const GROUP_ADMIN_TOP_LEVEL_KEYS = new Set([
+    'defaultChatProvider',
+    'defaultImageProvider',
+    'settings',
+    'chatProviders',
+    'imageProviders',
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -43,6 +89,60 @@ function mergeById(base: { id?: string }[], incoming: unknown): { id?: string }[
         }
     }
     return result;
+}
+
+/**
+ * 校验补丁是否允许由该角色写入:
+ * - operator(ADMIN_ID)不受限;
+ * - group_admin 只能改默认 provider/model 与展示类 settings。
+ * 不通过时抛错,由调用方转成给用户的提示。
+ */
+export function assertPatchAllowedFor(role: ConfigPatchRole, patch: Record<string, unknown>, base?: AppConfig): void {
+    if (role === 'operator') {
+        return;
+    }
+    for (const [key, value] of Object.entries(patch)) {
+        if (key === 'defaultChatProvider' || key === 'defaultImageProvider') {
+            continue;
+        }
+        // 白名单制:未显式允许的顶层键(settings / plugins / customCommands 等)一律拒绝
+        if (!GROUP_ADMIN_TOP_LEVEL_KEYS.has(key)) {
+            throw new Error(`Config key not permitted for group admins: ${key}`);
+        }
+        if (key === 'settings') {
+            if (!isRecord(value)) {
+                throw new Error('settings must be an object');
+            }
+            for (const settingKey of Object.keys(value)) {
+                if (!GROUP_ADMIN_SETTINGS_KEYS.has(settingKey)) {
+                    throw new Error(`Setting not permitted for group admins: ${settingKey}`);
+                }
+            }
+        } else if (key === 'chatProviders' || key === 'imageProviders') {
+            if (!Array.isArray(value)) {
+                throw new Error(`${key} must be an array`);
+            }
+            const baseList = ((base?.[key] ?? []) as { id?: string }[]).map(p => p.id);
+            for (const item of value) {
+                if (!isRecord(item)) {
+                    throw new Error(`${key} entries must be objects`);
+                }
+                // 只允许改已有 provider,禁止群管理员新增 provider(可注入无凭据可用/可禁用现有 provider)
+                const id = typeof item.id === 'string' ? item.id : '';
+                if (!id || !baseList.includes(id)) {
+                    throw new Error(`Adding provider entries is not permitted for group admins: ${key}`);
+                }
+                for (const field of Object.keys(item)) {
+                    if (field === 'id') {
+                        continue;
+                    }
+                    if (!GROUP_ADMIN_PROVIDER_FIELDS.has(field)) {
+                        throw new Error(`Provider field not permitted for group admins: ${field}`);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

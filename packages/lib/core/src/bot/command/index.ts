@@ -2,7 +2,7 @@ import type { RequestTemplate } from '@chatgpt-telegram-workers/plugins';
 import type * as Telegram from 'telegram-bot-api-types';
 import type { WorkerContext } from '../context';
 import type { CommandHandler } from './types';
-import { ENV } from '@chatgpt-telegram-workers/config';
+import { ENV, type ConfigPatchRole, assertPatchAllowedFor } from '@chatgpt-telegram-workers/config';
 import { executeRequest, formatInput } from '@chatgpt-telegram-workers/plugins';
 import { MessageSender } from '@chatgpt-telegram-workers/telegram';
 import { isGroupChat } from '../auth';
@@ -24,7 +24,8 @@ import {
 
 /**
  * `/setenv` / `/setenvs` / `/delenv`:把 subcommand 还原成完整表达式交给 handleConfigShortcut。
- * 这三个命令会写全局配置,权限由 canApplyConfigShortcut 判定(ADMIN_ID 或群管理员)。
+ * 这三个命令会写全局配置,权限由 resolveConfigShortcutRole 判定(ADMIN_ID 或群管理员);
+ * 群管理员仅能修改默认 provider/model 等展示类键,其余键由 assertPatchAllowedFor 拦截。
  */
 class ConfigShortcutCommandHandler implements CommandHandler {
     command: string;
@@ -85,7 +86,7 @@ async function handleSystemCommand(
         // 私聊时只有特权命令(如 /admin、配置快捷指令)限制为 ADMIN_ID,
         // 普通命令(白名单用户可用)不在此拦截
         const isPrivate = chatType === 'private';
-        if (command.privileged && isPrivate && ENV.ADMIN_ID && `${speakerId}` !== ENV.ADMIN_ID) {
+        if (command.privileged && isPrivate && (!ENV.ADMIN_ID || `${speakerId}` !== ENV.ADMIN_ID)) {
             return sender.sendPlainText('ERROR: Permission denied');
         }
         if (command.needAuth) {
@@ -148,21 +149,24 @@ async function handlePluginCommand(
 }
 
 /**
- * 快捷指令会写入全局 KV 配置,因此只允许 ADMIN_ID 本人或群管理员触发。
+ * 解析快捷指令写入者角色:
+ * - ADMIN_ID 本人 → operator(可写全部键)
+ * - 群管理员/群主 → group_admin(仅可写默认 provider/model 等展示类键)
+ * - 其它 → null(拒绝)
  */
-async function canApplyConfigShortcut(
+async function resolveConfigShortcutRole(
     message: Telegram.Message,
     speakerId: number,
     context: WorkerContext,
-): Promise<boolean> {
+): Promise<ConfigPatchRole | null> {
     if (ENV.ADMIN_ID && `${speakerId}` === ENV.ADMIN_ID) {
-        return true;
+        return 'operator';
     }
     if (!isGroupChat(message.chat.type)) {
-        return false;
+        return null;
     }
     const role = await loadChatRoleWithContext(message.chat.id, speakerId, context);
-    return role === 'administrator' || role === 'creator';
+    return role === 'administrator' || role === 'creator' ? 'group_admin' : null;
 }
 
 async function handleConfigShortcut(
@@ -181,11 +185,14 @@ async function handleConfigShortcut(
     if (shortcut === null) {
         return sender.sendPlainText(`ERROR: Invalid config shortcut: ${value}`);
     }
-    if (!(await canApplyConfigShortcut(message, speakerId, context))) {
+    const role = await resolveConfigShortcutRole(message, speakerId, context);
+    if (role === null) {
         return sender.sendPlainText('ERROR: Permission denied');
     }
     try {
         const current = await ENV.loadConfig(true);
+        // 群管理员只能改默认 provider/model 等展示类键;凭据/传输/访问控制/指令键仅 operator 可写
+        assertPatchAllowedFor(role, shortcut.patch, current);
         const next = applyConfigShortcut(current, shortcut);
         await ENV.getConfigStore().save(next);
         await ENV.loadConfig(true);
@@ -197,7 +204,8 @@ async function handleConfigShortcut(
 
 /**
  * `/setenv` / `/setenvs` / `/delenv`:把 subcommand 还原成完整表达式交给 handleConfigShortcut。
- * 这三个命令会写全局配置,权限由 canApplyConfigShortcut 判定(ADMIN_ID 或群管理员)。
+ * 这三个命令会写全局配置,权限由 resolveConfigShortcutRole 判定(ADMIN_ID 或群管理员);
+ * 群管理员仅能修改默认 provider/model 等展示类键,其余键由 assertPatchAllowedFor 拦截。
  */
 export async function handleCommandMessage(
     message: Telegram.Message,

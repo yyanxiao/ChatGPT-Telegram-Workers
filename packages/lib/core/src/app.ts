@@ -42,10 +42,11 @@ function makeResponse200(resp: Response | null): Response {
     if (resp.status === 200) {
         return resp;
     }
-    return new Response(resp.body, {
-        status: 200,
-        headers: { 'Original-Status': `${resp.status}`, ...resp.headers },
-    });
+    // Headers 实例没有可枚举自有属性,对象展开复制不到任何头;必须逐项拷贝,
+    // 否则会丢掉原来的 Content-Type 等响应头。
+    const headers = new Headers(resp.headers);
+    headers.set('Original-Status', `${resp.status}`);
+    return new Response(resp.body, { status: 200, headers });
 }
 
 function html(body: string): Response {
